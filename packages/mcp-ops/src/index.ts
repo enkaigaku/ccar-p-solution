@@ -1,2 +1,6 @@
-// Implemented in this package's M1 work package. See README.md for scope and contract.
-export {}
+export { ApprovalRejected, ApprovalVerifier, RejectionReason } from "./ApprovalVerifier.ts"
+export { AuditLog } from "./AuditLog.ts"
+export { ToolError } from "./McpToolServer.ts"
+export { OpsConfig } from "./OpsConfig.ts"
+export { OpsExecutor } from "./OpsExecutor.ts"
+export { makeOpsServer, opsTools } from "./OpsServer.ts"
