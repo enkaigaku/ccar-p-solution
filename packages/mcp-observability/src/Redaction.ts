@@ -112,8 +112,13 @@ export const RULES: ReadonlyArray<Rule> = [
   {
     name: "secret-assignment",
     pattern:
-      /\b(password|passwd|pwd|secret|client_secret|token|access_token|refresh_token|api[_-]?key|apikey|access[_-]?key|private[_-]?key|authorization|session[_-]?id|cookie|set-cookie)(["']?\s*[:=]\s*["']?)([^\s"'&,;}]+)/gi,
-    replace: (_m, key, sep) => `${key}${sep}${REDACTED}`,
+      /\b(password|passwd|pwd|secret|client_secret|token|access_token|refresh_token|api[_-]?key|apikey|access[_-]?key|private[_-]?key|authorization|session[_-]?id|cookie|set-cookie)(["']?\s*[:=]\s*)("(?:[^"\\]|\\.)*"?|'(?:[^'\\]|\\.)*'?|[^\s"'&,;}]+)/gi,
+    // A quoted value is replaced whole, spaces included, keeping its quotes; an unterminated quote runs to the end.
+    replace: (_m, key, sep, value) => {
+      const open = value.startsWith('"') || value.startsWith("'") ? value.charAt(0) : ""
+      const close = open !== "" && value.length > 1 && value.endsWith(open) ? open : ""
+      return `${key}${sep}${open}${REDACTED}${close}`
+    },
   },
   {
     name: "api-key",
@@ -169,8 +174,12 @@ export const redactText = (text: string): string =>
   )
 
 const redactJsonValue = (key: string | undefined, value: unknown): unknown => {
-  if (Predicate.isString(value)) {
-    return key === undefined || ALLOWED_FIELDS.has(key.toLowerCase()) ? redactText(value) : REDACTED
+  const allowed = key === undefined || ALLOWED_FIELDS.has(key.toLowerCase())
+  if (Predicate.isString(value)) return allowed ? redactText(value) : REDACTED
+  // Numbers can carry PII too (a phone or card number encoded as a JSON number): only allowlisted
+  // fields keep them, and only when the pattern rules find nothing in their digits.
+  if (Predicate.isNumber(value) || Predicate.isBigInt(value)) {
+    return allowed && redactText(String(value)) === String(value) ? value : REDACTED
   }
   if (Array.isArray(value)) return value.map((item) => redactJsonValue(key, item))
   if (Predicate.isObject(value)) {

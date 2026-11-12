@@ -21,6 +21,10 @@ describe("redactText", () => {
     ],
     ["password", "login failed password=hunter2 user=bob", `login failed password=${REDACTED} user=bob`],
     ["api key json-ish", '"api_key": "abc123secret"', `"api_key": "${REDACTED}"`],
+    ["quoted secret with spaces", 'login password="hello world" ok', `login password="${REDACTED}" ok`],
+    ["single-quoted secret", "token: 'a b c' next", `token: '${REDACTED}' next`],
+    ["escaped quote inside secret", 'secret="a \\" b" end', `secret="${REDACTED}" end`],
+    ["unterminated quoted secret", 'password="hello world', `password="${REDACTED}`],
     ["anthropic key", "using sk-ant-api03-abcdefghijklmnopqrstuv", "using [TOKEN]"],
     ["aws key", "AKIAIOSFODNN7EXAMPLE leaked", "[TOKEN] leaked"],
   ])("redacts %s", (_name, input, expected) => {
@@ -58,10 +62,30 @@ describe("redactLogLine", () => {
       level: "error",
       message: "payment failed for [EMAIL]",
       user_name: REDACTED,
-      address: { street: REDACTED, zip: 12345 },
+      address: { street: REDACTED, zip: REDACTED },
       http: { status_code: 502 },
       trace_id: "4bf92f3577b34da6a3ce929d0e0e4736",
     })
+  })
+
+  it("redacts numbers outside the allowlist and PII-shaped numbers inside it", () => {
+    const line = JSON.stringify({
+      phone: 13812345678,
+      credit_card: 4111111111111111,
+      code: 4111111111111111,
+      status: 500,
+    })
+    assert.deepStrictEqual(JSON.parse(redactLogLine(line)), {
+      phone: REDACTED,
+      credit_card: REDACTED,
+      code: REDACTED,
+      status: 500,
+    })
+  })
+
+  it("redacts a quoted secret inside an allowlisted message", () => {
+    const line = JSON.stringify({ message: 'auth failed password="hello world"' })
+    assert.deepStrictEqual(JSON.parse(redactLogLine(line)), { message: `auth failed password="${REDACTED}"` })
   })
 
   it("falls back to pattern rules for plain text and malformed JSON", () => {

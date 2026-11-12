@@ -1,13 +1,20 @@
 import { ObservabilityTools } from "@incident/contracts"
 import { Effect } from "effect"
 import { LIMITS } from "./LiveSource.ts"
-import { makeMcpServer, tool } from "./McpToolServer.ts"
+import { makeMcpServer, ToolError, tool } from "./McpToolServer.ts"
 import { redactLogLine, redactText } from "./Redaction.ts"
 import { TelemetrySource } from "./TelemetrySource.ts"
 
 const SERVER_VERSION = "0.1.0"
 
 const readOnly = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+
+/**
+ * Error messages can carry backend response bodies or echoed queries, so they pass the same
+ * pattern rules as results before they leave the server.
+ */
+const redactErrors = <A, R>(effect: Effect.Effect<A, ToolError, R>) =>
+  effect.pipe(Effect.mapError((error) => new ToolError({ message: redactText(error.message) })))
 
 const redactRecord = (record: Readonly<Record<string, string>>) =>
   Object.fromEntries(Object.entries(record).map(([k, v]) => [k, redactText(v)]))
@@ -25,7 +32,7 @@ export const observabilityTools = [
     annotations: { title: "Query metrics", ...readOnly },
     untrustedOutput: true,
     handler: (input) =>
-      TelemetrySource.use((source) => source.queryMetrics(input)).pipe(
+      redactErrors(TelemetrySource.use((source) => source.queryMetrics(input))).pipe(
         Effect.map((out) => ({ ...out, series: out.series.map((s) => ({ ...s, labels: redactRecord(s.labels) })) })),
       ),
   }),
@@ -37,7 +44,7 @@ export const observabilityTools = [
     annotations: { title: "Query logs", ...readOnly },
     untrustedOutput: true,
     handler: (input) =>
-      TelemetrySource.use((source) => source.queryLogs(input)).pipe(
+      redactErrors(TelemetrySource.use((source) => source.queryLogs(input))).pipe(
         Effect.map((out) => ({
           ...out,
           topMessages: out.topMessages.map((m) => ({ ...m, pattern: redactLogLine(m.pattern) })),
@@ -55,7 +62,7 @@ export const observabilityTools = [
     annotations: { title: "Get trace", ...readOnly },
     untrustedOutput: true,
     handler: (input) =>
-      TelemetrySource.use((source) => source.getTrace(input)).pipe(
+      redactErrors(TelemetrySource.use((source) => source.getTrace(input))).pipe(
         Effect.map((out) => ({
           ...out,
           spans: out.spans.map((s) => ({
@@ -73,7 +80,7 @@ export const observabilityTools = [
     ...ObservabilityTools.get_service_status,
     annotations: { title: "Get service status", ...readOnly },
     untrustedOutput: true,
-    handler: (input) => TelemetrySource.use((source) => source.getServiceStatus(input)),
+    handler: (input) => redactErrors(TelemetrySource.use((source) => source.getServiceStatus(input))),
   }),
   tool({
     name: "get_service_topology",
@@ -82,7 +89,7 @@ export const observabilityTools = [
     ...ObservabilityTools.get_service_topology,
     annotations: { title: "Get service topology", ...readOnly },
     untrustedOutput: true,
-    handler: (input) => TelemetrySource.use((source) => source.getServiceTopology(input)),
+    handler: (input) => redactErrors(TelemetrySource.use((source) => source.getServiceTopology(input))),
   }),
 ]
 
