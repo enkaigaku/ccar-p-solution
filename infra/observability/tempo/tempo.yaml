@@ -21,9 +21,10 @@ storage:
     local:
       path: /var/tempo/blocks
 
-compactor:
+# Tempo 3 removed the `compactor` block; retention is set on the backend worker.
+backend_worker:
   compaction:
-    block_retention: 168h # 7 days is enough for a demo; Postgres audit table keeps 90 days
+    block_retention: 168h # 7 days is enough for a demo; the Postgres audit table keeps 90 days
 
 usage_report:
   reporting_enabled: false
