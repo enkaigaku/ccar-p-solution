@@ -1,0 +1,163 @@
+apiVersion: 1
+
+# Alerts from the design doc ("可观测性 → 告警"). They are delivered to the api's Alertmanager
+# webhook, so Incident Copilot can investigate its own alerts. Metric names: see
+# packages/telemetry/src/Conventions.ts (Prometheus drops the dots, adds no suffixes).
+#
+# Provisioning files expand environment variables, so a literal dollar sign must be written `$$`.
+
+contactPoints:
+  - orgId: 1
+    name: incident-copilot-api
+    receivers:
+      - uid: incident-copilot-api-webhook
+        type: webhook
+        disableResolveMessage: false
+        settings:
+          url: $INCIDENT_API_WEBHOOK_URL
+          httpMethod: POST
+
+policies:
+  - orgId: 1
+    receiver: incident-copilot-api
+    group_by: ["alertname"]
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+
+groups:
+  - orgId: 1
+    name: incident-copilot
+    folder: Incident Copilot
+    interval: 1m
+    rules:
+      - uid: incident-prompt-cache-hit-low
+        title: PromptCacheHitRateLow
+        condition: C
+        for: 30m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          service: incident-copilot
+          severity: warning
+        annotations:
+          summary: Prompt cache hit rate below 50% for 30 minutes
+          description: >-
+            Share of prompt tokens served from the cache dropped below 50% (SLO 70%). The usual cause
+            is a change to the stable prefix: a timestamp, a random id or reordered tools in the
+            system prompt. Compare incident.prompt.version on recent spans.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum(rate(incident_llm_cache_read_tokens[10m]))
+                / (sum(rate(incident_llm_cache_read_tokens[10m])) + sum(rate(incident_llm_input_tokens[10m]))
+                   + sum(rate(incident_llm_cache_write_tokens[10m])))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [0.5] }
+
+      - uid: incident-llm-spend-near-budget
+        title: LlmDailySpendNearBudget
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels:
+          service: incident-copilot
+          severity: warning
+        annotations:
+          summary: Claude spend in the last 24 hours is above 80% of the daily budget
+          description: >-
+            Rolling 24-hour Claude spend divided by LLM_DAILY_BUDGET_USD is above 0.8. Check the
+            cost-by-step panel for the step that grew, and whether an investigation loop hit its
+            turn limit.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 86400, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: sum(increase(incident_llm_cost_usd[24h])) / max(incident_llm_daily_budget_usd)
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.8] }
+
+      - uid: incident-investigation-latency-high
+        title: InvestigationLatencyP95High
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          service: incident-copilot
+          severity: warning
+        annotations:
+          summary: Investigation p95 above 120 seconds
+          description: >-
+            p95 duration of the incident.investigation span over 15 minutes exceeds 120s (SLO 90s).
+            Open slow traces from the dashboard and look at agent turns and tool-call latency.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                histogram_quantile(0.95, sum by (le) (rate(incident_span_metrics_duration_bucket{span_name="incident.investigation"}[15m]))) / 1000
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [120] }
+
+      - uid: incident-unapproved-write-attempt
+        title: UnapprovedWriteAttempt
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels:
+          service: incident-copilot
+          severity: critical
+        annotations:
+          summary: mcp-ops rejected a write without a valid approval token
+          description: >-
+            A write tool call reached mcp-ops without a valid ApprovalToken (missing, expired, bad
+            signature or actionHash mismatch). The SLO is zero. Find the call in the audit table by
+            trace id and check which client sent it.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: sum(increase(incident_ops_unapproved_write_attempts[5m]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }

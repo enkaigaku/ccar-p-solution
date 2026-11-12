@@ -1,0 +1,12 @@
+# Copied over the OTel Demo's own compose.extras.yaml by infra/scripts/otel-demo.sh (the demo's
+# documented customization seam). Attaches the demo's collector to the network that
+# infra/observability/compose.yaml creates, so it can forward to the otel-gateway there.
+services:
+  otel-collector:
+    networks:
+      - default
+      - incident-observability
+
+networks:
+  incident-observability:
+    external: true

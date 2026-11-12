@@ -1,0 +1,22 @@
+# Copied over the OTel Demo's src/otel-collector/otelcol-config-extras.yml by
+# infra/scripts/otel-demo.sh. Loaded last on top of the demo's core otelcol-config.yml (demo 3.1.0,
+# collector-contrib 0.159.0).
+#
+# Forwards all demo telemetry to Incident Copilot's otel-gateway, which writes it to Tempo, Loki
+# and Prometheus. The collector replaces arrays when merging config files, so every exporter list
+# below is complete: `span_metrics` must stay in the traces pipeline because the core metrics
+# pipeline reads from it.
+exporters:
+  otlp_http/incident:
+    endpoint: http://otel-gateway:4318
+    sending_queue:
+      batch:
+
+service:
+  pipelines:
+    traces:
+      exporters: [span_metrics, otlp_http/incident]
+    metrics:
+      exporters: [otlp_http/incident]
+    logs:
+      exporters: [otlp_http/incident]
