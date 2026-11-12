@@ -119,6 +119,12 @@ describe("replay snapshot contract", () => {
       input: { promql: "  rate(x[1m]) ", start: "c", end: "d", stepSeconds: 60 },
     } as const
     assert.strictEqual(replayKey(a), replayKey(b))
+    const metric = (promql: string) =>
+      ({ tool: "query_metrics", input: { promql, start: "a", end: "b", stepSeconds: 15 } }) as const
+    // Whitespace inside label values is significant.
+    assert.notStrictEqual(replayKey(metric('x{m="charge  failed"}')), replayKey(metric('x{m="charge failed"}')))
+    assert.strictEqual(replayKey(metric('x{m="a \\" b"}  ')), 'query_metrics|x{m="a \\" b"}')
+    assert.strictEqual(replayKey(metric("sum(\n  rate(x[1m])\n)")), "query_metrics|sum( rate(x[1m]) )")
     assert.strictEqual(replayFallbackKey(a), undefined)
     const logs = { tool: "query_logs", input: { service: "payment", start: "a", end: "b", limit: 5 } } as const
     assert.strictEqual(replayKey(logs), "query_logs|payment||")
