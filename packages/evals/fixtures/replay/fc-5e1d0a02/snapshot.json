@@ -1,0 +1,304 @@
+{
+  "version": 1,
+  "caseId": "fc-5e1d0a02",
+  "recordedAt": "2026-11-12T03:05:00.000Z",
+  "window": {
+    "start": "2026-11-12T02:50:00.000Z",
+    "end": "2026-11-12T03:05:00.000Z"
+  },
+  "alert": {
+    "status": "firing",
+    "labels": {
+      "alertname": "HighErrorRate",
+      "service": "frontend",
+      "severity": "critical"
+    },
+    "annotations": {
+      "summary": "frontend 5xx above 2%"
+    },
+    "startsAt": "2026-11-12T03:00:00.000Z",
+    "endsAt": "0001-01-01T00:00:00.000Z",
+    "fingerprint": "5e1d0a02"
+  },
+  "calls": [
+    {
+      "tool": "get_service_topology",
+      "input": {},
+      "output": {
+        "ref": "topology:fc-5e1d0a02",
+        "edges": [
+          {
+            "from": "frontend",
+            "to": "checkout",
+            "protocol": "grpc"
+          },
+          {
+            "from": "frontend",
+            "to": "cart",
+            "protocol": "grpc"
+          },
+          {
+            "from": "frontend",
+            "to": "ad",
+            "protocol": "grpc"
+          },
+          {
+            "from": "frontend",
+            "to": "product-catalog",
+            "protocol": "grpc"
+          },
+          {
+            "from": "frontend",
+            "to": "recommendation",
+            "protocol": "grpc"
+          },
+          {
+            "from": "checkout",
+            "to": "payment",
+            "protocol": "grpc"
+          },
+          {
+            "from": "checkout",
+            "to": "cart",
+            "protocol": "grpc"
+          },
+          {
+            "from": "checkout",
+            "to": "email",
+            "protocol": "http"
+          },
+          {
+            "from": "checkout",
+            "to": "shipping",
+            "protocol": "http"
+          },
+          {
+            "from": "shipping",
+            "to": "quote",
+            "protocol": "http"
+          },
+          {
+            "from": "checkout",
+            "to": "currency",
+            "protocol": "grpc"
+          },
+          {
+            "from": "recommendation",
+            "to": "product-catalog",
+            "protocol": "grpc"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "get_service_status",
+      "input": {},
+      "output": {
+        "ref": "status:fc-5e1d0a02",
+        "services": [
+          {
+            "name": "frontend",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "checkout",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "payment",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "cart",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "ad",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "product-catalog",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "recommendation",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "email",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "shipping",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "quote",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "currency",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "level": "error"
+      },
+      "output": {
+        "ref": "logs:fc-5e1d0a02:frontend",
+        "totalMatched": 35,
+        "countsByLevel": {
+          "info": 900,
+          "error": 35
+        },
+        "topMessages": [
+          {
+            "pattern": "failed to empty user cart",
+            "count": 35
+          }
+        ],
+        "samples": [
+          {
+            "ref": "logs:fc-5e1d0a02:frontend#0",
+            "timestamp": "2026-11-12T03:00:00.000Z",
+            "line": "failed to empty user cart"
+          },
+          {
+            "ref": "logs:fc-5e1d0a02:frontend#1",
+            "timestamp": "2026-11-12T03:01:00.000Z",
+            "line": "failed to empty user cart"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "cart",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "level": "error"
+      },
+      "output": {
+        "ref": "logs:fc-5e1d0a02:cart",
+        "totalMatched": 61,
+        "countsByLevel": {
+          "info": 900,
+          "error": 61
+        },
+        "topMessages": [
+          {
+            "pattern": "Can't access cart storage. System.ApplicationException: Wasn't able to connect to redis",
+            "count": 61
+          }
+        ],
+        "samples": [
+          {
+            "ref": "logs:fc-5e1d0a02:cart#0",
+            "timestamp": "2026-11-12T03:00:00.000Z",
+            "line": "Can't access cart storage. System.ApplicationException: Wasn't able to connect to redis"
+          },
+          {
+            "ref": "logs:fc-5e1d0a02:cart#1",
+            "timestamp": "2026-11-12T03:01:00.000Z",
+            "line": "Can't access cart storage. System.ApplicationException: Wasn't able to connect to redis"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "checkout",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "level": "error"
+      },
+      "output": {
+        "ref": "logs:fc-5e1d0a02:checkout",
+        "totalMatched": 20,
+        "countsByLevel": {
+          "info": 900,
+          "error": 20
+        },
+        "topMessages": [
+          {
+            "pattern": "failed to empty user cart during checkout",
+            "count": 20
+          }
+        ],
+        "samples": [
+          {
+            "ref": "logs:fc-5e1d0a02:checkout#0",
+            "timestamp": "2026-11-12T03:00:00.000Z",
+            "line": "failed to empty user cart during checkout"
+          },
+          {
+            "ref": "logs:fc-5e1d0a02:checkout#1",
+            "timestamp": "2026-11-12T03:01:00.000Z",
+            "line": "failed to empty user cart during checkout"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls_total{service_name=\"cart\",status_code=\"STATUS_CODE_ERROR\"}[1m]))",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "stepSeconds": 60
+      },
+      "output": {
+        "ref": "metrics:fc-5e1d0a02:cart-errors",
+        "series": [
+          {
+            "labels": {
+              "service_name": "cart"
+            },
+            "min": 0.0,
+            "max": 1.1,
+            "avg": 0.6,
+            "last": 1.0,
+            "tail": [
+              ["2026-11-12T03:00:00.000Z", 0.0],
+              ["2026-11-12T03:01:00.000Z", 0.0],
+              ["2026-11-12T03:02:00.000Z", 0.9],
+              ["2026-11-12T03:03:00.000Z", 1.1],
+              ["2026-11-12T03:04:00.000Z", 1.0]
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
