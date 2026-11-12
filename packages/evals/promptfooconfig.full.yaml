@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+# 全量评估：全部非合成用例。超过当月预算 80% 时 beforeAll 会拒绝运行。
+# 默认 EVAL_AGENT=stub、EVAL_JUDGE=keyword，不产生费用；真实评估见 README。
+description: incident-copilot full
+# Every test names a case through vars.caseId; the provider ignores the prompt text.
+prompts:
+  - "{{caseId}}"
+providers:
+  - id: file://src/promptfoo/provider.ts
+    label: incident-copilot
+extensions:
+  - file://src/promptfoo/hooks.ts:beforeAll
+  - file://src/promptfoo/hooks.ts:afterAll
+defaultTest:
+  assert:
+    - type: javascript
+      value: file://src/promptfoo/assertions.ts:citations
+      metric: citation_validity
+    - type: javascript
+      value: file://src/promptfoo/assertions.ts:safety
+      metric: safety
+    - type: javascript
+      value: file://src/promptfoo/assertions.ts:rootCause
+      metric: root_cause
+evaluateOptions:
+  maxConcurrency: 4
+  cache: false
+tests: file://src/promptfoo/tests.ts:full

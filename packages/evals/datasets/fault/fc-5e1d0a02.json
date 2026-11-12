@@ -1,0 +1,21 @@
+{
+  "kind": "fault",
+  "id": "fc-5e1d0a02",
+  "snapshotId": "fc-5e1d0a02",
+  "smoke": true,
+  "groundTruth": {
+    "rootCause": "The cart service fails EmptyCart calls (injected cartFailure flag), surfacing as frontend and checkout errors.",
+    "service": "cart",
+    "acceptableAlternatives": ["cart service cannot reach its storage and fails requests"],
+    "fault": {
+      "flag": "cartFailure",
+      "variant": "50%"
+    }
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["cart", "error-rate"],
+  "synthetic": true
+}
