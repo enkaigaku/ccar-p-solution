@@ -13,6 +13,12 @@ dir="$here/.otel-demo"
 extras="$here/observability/otel-demo"
 compose=(docker compose -f compose.yaml -f compose.extras.yaml)
 
+# The demo's .env pins DEMO_VERSION=latest, which pulls images built from the demo's main branch
+# while the compose file and collector config come from the tag. Those drift apart (main's
+# recommendation is a Java rewrite that exports OTLP/HTTP to 4318, but the 3.1.0 compose points
+# it at gRPC 4317), so pin the images to the checked-out tag. Shell variables override .env.
+export DEMO_VERSION="$OTEL_DEMO_VERSION" IMAGE_VERSION="$OTEL_DEMO_VERSION"
+
 if [ ! -d "$dir" ]; then
   git clone --depth 1 --branch "$OTEL_DEMO_VERSION" https://github.com/open-telemetry/opentelemetry-demo.git "$dir"
 fi
