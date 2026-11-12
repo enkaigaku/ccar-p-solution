@@ -1,0 +1,21 @@
+{
+  "kind": "fault",
+  "id": "fc-5e1d0a03",
+  "snapshotId": "fc-5e1d0a03",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The ad service is CPU-saturated (injected adHighCpu flag), slowing the frontend pages that wait on ads.",
+    "service": "ad",
+    "acceptableAlternatives": ["high CPU in the ad service increases frontend latency"],
+    "fault": {
+      "flag": "adHighCpu",
+      "variant": "on"
+    }
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["ad", "latency"],
+  "synthetic": true
+}

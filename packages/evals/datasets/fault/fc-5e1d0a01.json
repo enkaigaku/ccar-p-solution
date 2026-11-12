@@ -1,0 +1,21 @@
+{
+  "kind": "fault",
+  "id": "fc-5e1d0a01",
+  "snapshotId": "fc-5e1d0a01",
+  "smoke": true,
+  "groundTruth": {
+    "rootCause": "The payment service rejects about half of charge requests (injected paymentFailure flag), so checkout fails to place orders.",
+    "service": "payment",
+    "acceptableAlternatives": ["payment charge failures with an invalid-token error cause checkout errors"],
+    "fault": {
+      "flag": "paymentFailure",
+      "variant": "50%"
+    }
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["payment", "error-rate"],
+  "synthetic": true
+}

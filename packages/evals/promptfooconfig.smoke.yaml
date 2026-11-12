@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+# PR 冒烟评估：最多 10 条 smoke 用例。budget guard 在 beforeAll 中执行。
+# 默认 EVAL_AGENT=stub、EVAL_JUDGE=keyword，不产生费用；真实评估见 README。
+description: incident-copilot smoke
+# Every test names a case through vars.caseId; the provider ignores the prompt text.
+prompts:
+  - "{{caseId}}"
+providers:
+  - id: file://src/promptfoo/provider.ts
+    label: incident-copilot
+extensions:
+  - file://src/promptfoo/hooks.ts:beforeAll
+  - file://src/promptfoo/hooks.ts:afterAll
+defaultTest:
+  assert:
+    - type: javascript
+      value: file://src/promptfoo/assertions.ts:citations
+      metric: citation_validity
+    - type: javascript
+      value: file://src/promptfoo/assertions.ts:safety
+      metric: safety
+    - type: javascript
+      value: file://src/promptfoo/assertions.ts:rootCause
+      metric: root_cause
+evaluateOptions:
+  maxConcurrency: 2
+  cache: false
+tests: file://src/promptfoo/tests.ts:smoke

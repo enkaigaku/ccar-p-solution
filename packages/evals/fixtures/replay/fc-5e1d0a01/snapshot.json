@@ -1,0 +1,352 @@
+{
+  "version": 1,
+  "caseId": "fc-5e1d0a01",
+  "recordedAt": "2026-11-12T03:05:00.000Z",
+  "window": {
+    "start": "2026-11-12T02:50:00.000Z",
+    "end": "2026-11-12T03:05:00.000Z"
+  },
+  "alert": {
+    "status": "firing",
+    "labels": {
+      "alertname": "HighErrorRate",
+      "service": "checkout",
+      "severity": "critical"
+    },
+    "annotations": {
+      "summary": "checkout error rate above 5%"
+    },
+    "startsAt": "2026-11-12T03:00:00.000Z",
+    "endsAt": "0001-01-01T00:00:00.000Z",
+    "fingerprint": "5e1d0a01"
+  },
+  "calls": [
+    {
+      "tool": "get_service_topology",
+      "input": {},
+      "output": {
+        "ref": "topology:fc-5e1d0a01",
+        "edges": [
+          {
+            "from": "frontend",
+            "to": "checkout",
+            "protocol": "grpc"
+          },
+          {
+            "from": "frontend",
+            "to": "cart",
+            "protocol": "grpc"
+          },
+          {
+            "from": "frontend",
+            "to": "ad",
+            "protocol": "grpc"
+          },
+          {
+            "from": "frontend",
+            "to": "product-catalog",
+            "protocol": "grpc"
+          },
+          {
+            "from": "frontend",
+            "to": "recommendation",
+            "protocol": "grpc"
+          },
+          {
+            "from": "checkout",
+            "to": "payment",
+            "protocol": "grpc"
+          },
+          {
+            "from": "checkout",
+            "to": "cart",
+            "protocol": "grpc"
+          },
+          {
+            "from": "checkout",
+            "to": "email",
+            "protocol": "http"
+          },
+          {
+            "from": "checkout",
+            "to": "shipping",
+            "protocol": "http"
+          },
+          {
+            "from": "shipping",
+            "to": "quote",
+            "protocol": "http"
+          },
+          {
+            "from": "checkout",
+            "to": "currency",
+            "protocol": "grpc"
+          },
+          {
+            "from": "recommendation",
+            "to": "product-catalog",
+            "protocol": "grpc"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "get_service_status",
+      "input": {},
+      "output": {
+        "ref": "status:fc-5e1d0a01",
+        "services": [
+          {
+            "name": "frontend",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "checkout",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "payment",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "cart",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "ad",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "product-catalog",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "recommendation",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "email",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "shipping",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "quote",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "currency",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "checkout",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "level": "error"
+      },
+      "output": {
+        "ref": "logs:fc-5e1d0a01:checkout",
+        "totalMatched": 118,
+        "countsByLevel": {
+          "info": 900,
+          "error": 118
+        },
+        "topMessages": [
+          {
+            "pattern": "failed to charge card: could not charge the card: rpc error: code = Unknown",
+            "count": 118
+          }
+        ],
+        "samples": [
+          {
+            "ref": "logs:fc-5e1d0a01:checkout#0",
+            "timestamp": "2026-11-12T03:00:00.000Z",
+            "line": "failed to charge card: could not charge the card: rpc error: code = Unknown"
+          },
+          {
+            "ref": "logs:fc-5e1d0a01:checkout#1",
+            "timestamp": "2026-11-12T03:01:00.000Z",
+            "line": "failed to charge card: could not charge the card: rpc error: code = Unknown"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "payment",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "level": "error"
+      },
+      "output": {
+        "ref": "logs:fc-5e1d0a01:payment",
+        "totalMatched": 131,
+        "countsByLevel": {
+          "info": 900,
+          "error": 131
+        },
+        "topMessages": [
+          {
+            "pattern": "Payment request failed. Invalid token. app.loyalty.level=gold",
+            "count": 131
+          }
+        ],
+        "samples": [
+          {
+            "ref": "logs:fc-5e1d0a01:payment#0",
+            "timestamp": "2026-11-12T03:00:00.000Z",
+            "line": "Payment request failed. Invalid token. app.loyalty.level=gold"
+          },
+          {
+            "ref": "logs:fc-5e1d0a01:payment#1",
+            "timestamp": "2026-11-12T03:01:00.000Z",
+            "line": "Payment request failed. Invalid token. app.loyalty.level=gold"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "level": "error"
+      },
+      "output": {
+        "ref": "logs:fc-5e1d0a01:frontend",
+        "totalMatched": 40,
+        "countsByLevel": {
+          "info": 900,
+          "error": 40
+        },
+        "topMessages": [
+          {
+            "pattern": "failed to complete the order",
+            "count": 40
+          }
+        ],
+        "samples": [
+          {
+            "ref": "logs:fc-5e1d0a01:frontend#0",
+            "timestamp": "2026-11-12T03:00:00.000Z",
+            "line": "failed to complete the order"
+          },
+          {
+            "ref": "logs:fc-5e1d0a01:frontend#1",
+            "timestamp": "2026-11-12T03:01:00.000Z",
+            "line": "failed to complete the order"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "cart",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "level": "error"
+      },
+      "output": {
+        "ref": "logs:fc-5e1d0a01:cart",
+        "totalMatched": 0,
+        "countsByLevel": {
+          "info": 900
+        },
+        "topMessages": [],
+        "samples": []
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls_total{service_name=\"checkout\",status_code=\"STATUS_CODE_ERROR\"}[1m]))",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "stepSeconds": 60
+      },
+      "output": {
+        "ref": "metrics:fc-5e1d0a01:checkout-errors",
+        "series": [
+          {
+            "labels": {
+              "service_name": "checkout"
+            },
+            "min": 0.0,
+            "max": 2.1,
+            "avg": 1.22,
+            "last": 2.0,
+            "tail": [
+              ["2026-11-12T03:00:00.000Z", 0.0],
+              ["2026-11-12T03:01:00.000Z", 0.1],
+              ["2026-11-12T03:02:00.000Z", 1.9],
+              ["2026-11-12T03:03:00.000Z", 2.1],
+              ["2026-11-12T03:04:00.000Z", 2.0]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls_total{service_name=\"payment\",status_code=\"STATUS_CODE_ERROR\"}[1m]))",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "stepSeconds": 60
+      },
+      "output": {
+        "ref": "metrics:fc-5e1d0a01:payment-errors",
+        "series": [
+          {
+            "labels": {
+              "service_name": "payment"
+            },
+            "min": 0.0,
+            "max": 2.2,
+            "avg": 1.28,
+            "last": 2.1,
+            "tail": [
+              ["2026-11-12T03:00:00.000Z", 0.0],
+              ["2026-11-12T03:01:00.000Z", 0.1],
+              ["2026-11-12T03:02:00.000Z", 2.0],
+              ["2026-11-12T03:03:00.000Z", 2.2],
+              ["2026-11-12T03:04:00.000Z", 2.1]
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
