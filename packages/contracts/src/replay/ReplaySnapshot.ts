@@ -60,7 +60,37 @@ export class ReplaySnapshot extends Schema.Class<ReplaySnapshot>("@incident/cont
   calls: Schema.Array(RecordedToolCall),
 }) {}
 
-const squash = (text: string) => text.trim().replace(/\s+/g, " ")
+/**
+ * Collapses whitespace outside PromQL string literals ("...", '...', `...`); literals are kept byte for byte,
+ * so queries matching different label values never share a key.
+ */
+const squash = (promql: string): string => {
+  let out = ""
+  let quote: string | undefined
+  let pendingSpace = false
+  for (let i = 0; i < promql.length; i++) {
+    const ch = promql[i] ?? ""
+    if (quote !== undefined) {
+      out += ch
+      if (ch === "\\" && quote !== "`") {
+        out += promql[i + 1] ?? ""
+        i++
+      } else if (ch === quote) {
+        quote = undefined
+      }
+      continue
+    }
+    if (/\s/.test(ch)) {
+      pendingSpace = out !== ""
+      continue
+    }
+    if (pendingSpace) out += " "
+    pendingSpace = false
+    out += ch
+    if (ch === '"' || ch === "'" || ch === "`") quote = ch
+  }
+  return out
+}
 
 /**
  * Exact match key for a tool call. Time fields (`start`, `end`, `stepSeconds`) and `limit` are excluded because
