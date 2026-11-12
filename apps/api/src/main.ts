@@ -1,6 +1,7 @@
 import { createServer } from "node:http"
 import { NodeHttpServer, NodeRuntime } from "@effect/platform-node"
 import { IncidentApi } from "@incident/contracts"
+import { TelemetryLive } from "@incident/telemetry"
 import { Config, Effect, Layer } from "effect"
 import { HttpRouter } from "effect/http"
 import { HttpApiScalar } from "effect/http-api"
@@ -16,6 +17,10 @@ const ServerLayer = Layer.unwrap(
       Layer.provide(NodeHttpServer.layer(createServer, { port })),
     )
   }),
-).pipe(Layer.provide(IncidentStore.layerMemory))
+).pipe(
+  Layer.provide(IncidentStore.layerMemory),
+  // Provided last so every span, including the HTTP server spans, is exported.
+  Layer.provide(TelemetryLive({ serviceName: "incident-api" })),
+)
 
 Layer.launch(ServerLayer).pipe(NodeRuntime.runMain)

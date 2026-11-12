@@ -20,5 +20,10 @@
     "turbo": "2.11.11",
     "typescript": "7.0.2",
     "vitest": "5.1.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@opentelemetry/api": "1.9.1"
+    }
   }
 }
