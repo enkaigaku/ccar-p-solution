@@ -9,13 +9,22 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run",
+    "evals": "node src/cli.ts",
+    "eval:stub": "EVAL_INCLUDE_SYNTHETIC=true EVAL_MODE=smoke PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfooconfig.smoke.yaml --no-cache",
+    "eval:smoke": "EVAL_MODE=smoke PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfooconfig.smoke.yaml --no-cache",
+    "eval:full": "EVAL_MODE=full PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfooconfig.full.yaml --no-cache",
+    "record": "node src/cli.ts record"
   },
   "dependencies": {
-    "effect": "4.1.4",
-    "@incident/contracts": "workspace:*"
+    "@anthropic-ai/sdk": "1.8.0",
+    "@effect/platform-node": "4.1.4",
+    "@incident/contracts": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "effect": "4.1.4"
   },
   "devDependencies": {
-    "@effect/vitest": "4.1.4"
+    "@effect/vitest": "4.1.4",
+    "promptfoo": "0.125.1"
   }
 }

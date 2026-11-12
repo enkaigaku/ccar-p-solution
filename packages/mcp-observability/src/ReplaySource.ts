@@ -1,0 +1,92 @@
+import {
+  type RecordedToolCall,
+  ReplaySnapshot,
+  replayFallbackKey,
+  replayKey,
+  type ToolCallRequest,
+} from "@incident/contracts"
+import { Effect, FileSystem, Layer, Path, Schema } from "effect"
+import { ToolError } from "./McpToolServer.ts"
+import { makeRef, TelemetrySource } from "./TelemetrySource.ts"
+
+/*
+ * Replay mode (ADR 007): answer tool calls from a telemetry snapshot recorded during fault injection.
+ * Snapshot format and matching keys are the `ReplaySnapshot` contract.
+ */
+
+export const ReplaySourceLayer = (location: { readonly dir: string; readonly caseId: string | undefined }) =>
+  Layer.effect(
+    TelemetrySource,
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const file =
+        location.caseId === undefined
+          ? path.join(location.dir, "snapshot.json")
+          : path.join(location.dir, location.caseId, "snapshot.json")
+      const snapshot = yield* fs
+        .readFileString(file)
+        .pipe(Effect.flatMap(Schema.decodeUnknownEffect(Schema.fromJsonString(ReplaySnapshot))))
+      yield* Effect.logInfo(`Replay mode: case ${snapshot.caseId} (${snapshot.calls.length} recorded calls)`)
+
+      const exact = new Map<string, RecordedToolCall>()
+      const fallback = new Map<string, RecordedToolCall>()
+      // First recording wins when several calls share a key.
+      for (const recorded of snapshot.calls) {
+        const key = replayKey(recorded)
+        if (!exact.has(key)) exact.set(key, recorded)
+        const loose = replayFallbackKey(recorded)
+        if (loose !== undefined && !fallback.has(loose)) fallback.set(loose, recorded)
+      }
+
+      const lookup = (call: ToolCallRequest): RecordedToolCall | undefined => {
+        const loose = replayFallbackKey(call)
+        return exact.get(replayKey(call)) ?? (loose === undefined ? undefined : fallback.get(loose))
+      }
+
+      return TelemetrySource.of({
+        queryMetrics: (input) => {
+          const hit = lookup({ tool: "query_metrics", input })
+          return Effect.succeed(
+            hit?.tool === "query_metrics" ? hit.output : { ref: makeRef("query_metrics", input), series: [] },
+          )
+        },
+        queryLogs: (input) => {
+          const hit = lookup({ tool: "query_logs", input })
+          return Effect.succeed(
+            hit?.tool === "query_logs"
+              ? hit.output
+              : {
+                  ref: makeRef("query_logs", input),
+                  totalMatched: 0,
+                  countsByLevel: {},
+                  topMessages: [],
+                  samples: [],
+                },
+          )
+        },
+        getTrace: (input) => {
+          const hit = lookup({ tool: "get_trace", input })
+          return hit?.tool === "get_trace"
+            ? Effect.succeed(hit.output)
+            : Effect.fail(new ToolError({ message: "Trace not found" }))
+        },
+        getServiceStatus: (input) => {
+          const hit = lookup({ tool: "get_service_status", input })
+          return Effect.succeed(
+            hit?.tool === "get_service_status"
+              ? hit.output
+              : { ref: makeRef("get_service_status", input), services: [] },
+          )
+        },
+        getServiceTopology: (input) => {
+          const hit = lookup({ tool: "get_service_topology", input })
+          return Effect.succeed(
+            hit?.tool === "get_service_topology"
+              ? hit.output
+              : { ref: makeRef("get_service_topology", input), edges: [] },
+          )
+        },
+      })
+    }),
+  )
