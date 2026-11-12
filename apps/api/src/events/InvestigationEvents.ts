@@ -47,11 +47,15 @@ export class InvestigationEvents extends Context.Service<
             // Subscribe before reading the history: an event published in between shows up in both and is
             // dropped from the live part by its sequence number, so nothing is lost or duplicated.
             const subscription = yield* PubSub.subscribe(pubsub)
-            const past = ((yield* Ref.get(history)).get(id) ?? []).filter((e) => e.seq > afterSeq)
-            const last = past.at(-1)?.seq ?? afterSeq
-            if (past.some((e) => isTerminalEvent(e.event))) {
-              return Stream.fromIterable(past).pipe(Stream.takeUntil((e) => isTerminalEvent(e.event)))
+            const all = (yield* Ref.get(history)).get(id) ?? []
+            const terminal = all.findIndex((e) => isTerminalEvent(e.event))
+            if (terminal >= 0) {
+              // Finished: decide on the whole history, so a client resuming after the terminal event (its
+              // Last-Event-ID) gets an ended stream instead of waiting for events that never come.
+              return Stream.fromIterable(all.slice(0, terminal + 1).filter((e) => e.seq > afterSeq))
             }
+            const past = all.filter((e) => e.seq > afterSeq)
+            const last = past.at(-1)?.seq ?? afterSeq
             const live = Stream.fromSubscription(subscription).pipe(
               Stream.filter((e) => e.event.investigationId === id && e.seq > last),
             )

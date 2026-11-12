@@ -148,6 +148,54 @@ describe("Investigator", () => {
     }),
   )
 
+  it.effect("applies the budget on pause_turn continuations and caps the turns", () =>
+    Effect.gen(function* () {
+      const { outcome, requests } = yield* run(
+        Array.from({ length: 6 }, () => reply("pause_turn", [text("thinking...")])),
+        { maxTurns: 1, maxCostUsd: 5 },
+      )
+      assert.strictEqual(outcome._tag, "Failure")
+      if (outcome._tag === "Failure") assert.strictEqual(outcome.failure.reason, "report")
+      // maxTurns + the forced final answer + one pause.
+      assert.strictEqual(requests.length, 3)
+      assert.deepStrictEqual(requests[1]?.tool_choice, { type: "none" })
+      assert.include(userMessages(requests[1] ?? {}), "budget is used up")
+    }),
+  )
+
+  it.effect("skips the citation repair once the budget is spent and drops the invalid citations", () =>
+    Effect.gen(function* () {
+      const { outcome, requests } = yield* run(
+        [
+          reply("end_turn", [
+            jsonText({
+              status: "completed",
+              hypotheses: [
+                {
+                  summary: "payment fails",
+                  confidence: 0.8,
+                  evidence: [
+                    { kind: "chunk", ref: "stub-runbook-1", note: "" },
+                    { kind: "log", ref: "logs-invented", note: "" },
+                  ],
+                },
+              ],
+            }),
+          ]),
+        ],
+        { maxTurns: 1, maxCostUsd: 5 },
+      )
+      assert.strictEqual(requests.length, 1)
+      assert.strictEqual(outcome._tag, "Success")
+      if (outcome._tag !== "Success") return
+      assert.strictEqual(outcome.success.droppedCitations, 1)
+      assert.deepStrictEqual(
+        outcome.success.hypotheses[0]?.evidence.map((e) => e.ref),
+        ["stub-runbook-1"],
+      )
+    }),
+  )
+
   it.effect("reports insufficient information without proposals", () =>
     Effect.gen(function* () {
       const { outcome } = yield* run([

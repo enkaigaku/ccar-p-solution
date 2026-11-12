@@ -29,6 +29,9 @@ export const InvestigationModel = "claude-opus-5-5"
 const FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 /** Proposals are only turned into approval requests when the top hypothesis is at least this confident. */
+/** Turns allowed past `maxTurns`: the forced final answer and one pause or citation repair. */
+const FINAL_TURNS = 2
+
 export const MIN_PROPOSAL_CONFIDENCE = 0.5
 
 export interface AgentSettings {
@@ -381,7 +384,22 @@ export class Investigator extends Context.Service<
         let turn = 0
         let finalizing = false
         let repaired = false
+        const budgetSpent = Ref.get(cost).pipe(
+          Effect.map((spent) => ({ spent, over: turn >= settings.maxTurns || spent >= settings.maxCostUsd })),
+        )
+        const budgetNotice: Anthropic.Beta.BetaTextBlockParam = {
+          type: "text",
+          text: "The investigation budget is used up. Do not call more tools; reply with the final report now, based on the evidence you have.",
+        }
         while (true) {
+          // Hard cap for every continuation path (tool use, pause_turn, citation repair): the budget allows
+          // maxTurns turns plus one forced final answer and one more for a pause or repair in between.
+          if (turn >= settings.maxTurns + FINAL_TURNS) {
+            return yield* new InvestigationFailed({
+              reason: "report",
+              message: "no final report within the investigation budget",
+            })
+          }
           turn++
           yield* events.publish(new StepStarted({ investigationId, step: "agent_turn", turn }))
           const params: MessageParams = {
@@ -422,9 +440,16 @@ export class Investigator extends Context.Service<
                 reason: "max_tokens",
                 message: `stopped with ${response.stop_reason}`,
               })
-            case "pause_turn":
+            case "pause_turn": {
               messages.push({ role: "assistant", content: response.content })
+              const budget = yield* budgetSpent
+              if (!finalizing && budget.over) {
+                finalizing = true
+                messages.push({ role: "user", content: [budgetNotice] })
+                yield* Effect.logInfo("Agent budget reached").pipe(Effect.annotateLogs({ turn, spent: budget.spent }))
+              }
               continue
+            }
             case "tool_use": {
               if (finalizing) {
                 return yield* new InvestigationFailed({
@@ -435,15 +460,12 @@ export class Investigator extends Context.Service<
               messages.push({ role: "assistant", content: response.content })
               const blocks = response.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use")
               const results = yield* Effect.forEach(blocks, runTool, { concurrency: 4 })
-              const spent = yield* Ref.get(cost)
-              finalizing = turn >= settings.maxTurns || spent >= settings.maxCostUsd
+              const budget = yield* budgetSpent
+              finalizing = budget.over
               const content: Array<Anthropic.Beta.BetaContentBlockParam> = [...results]
               if (finalizing) {
-                content.push({
-                  type: "text",
-                  text: "The investigation budget is used up. Do not call more tools; reply with the final report now, based on the evidence you have.",
-                })
-                yield* Effect.logInfo("Agent budget reached").pipe(Effect.annotateLogs({ turn, spent }))
+                content.push(budgetNotice)
+                yield* Effect.logInfo("Agent budget reached").pipe(Effect.annotateLogs({ turn, spent: budget.spent }))
               }
               messages.push({ role: "user", content })
               continue
@@ -456,7 +478,8 @@ export class Investigator extends Context.Service<
                 ),
               )
               const invalid = invalidCitations(report, citable)
-              if (invalid.length > 0 && !repaired && !finalizing) {
+              // No repair once the budget is spent: the invalid citations are dropped instead.
+              if (invalid.length > 0 && !repaired && !finalizing && !(yield* budgetSpent).over) {
                 // One repair round: tell the model which refs do not exist, then accept what it returns.
                 repaired = true
                 messages.push({ role: "assistant", content: response.content })

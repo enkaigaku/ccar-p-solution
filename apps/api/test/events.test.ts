@@ -36,6 +36,14 @@ describe("InvestigationEvents", () => {
       // A late subscriber of a finished investigation gets the history and an ended stream.
       const late = yield* events.stream(a).pipe(Stream.runCollect)
       assert.strictEqual(late.length, 4)
+      // Resuming after the terminal event ends at once instead of waiting forever.
+      const resumed = yield* events.stream(a, 4).pipe(Stream.runCollect)
+      assert.strictEqual(resumed.length, 0)
+      const beforeEnd = yield* events.stream(a, 3).pipe(Stream.runCollect)
+      assert.deepStrictEqual(
+        beforeEnd.map((e) => e.seq),
+        [4],
+      )
     }).pipe(Effect.provide(InvestigationEvents.layer)),
   )
 
