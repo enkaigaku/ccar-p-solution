@@ -35,9 +35,18 @@ importers:
       '@effect/platform-node':
         specifier: 4.1.4
         version: 4.1.4(effect@4.1.4)(redis@6.3.1(@opentelemetry/api@1.9.1))
+      '@effect/sql-pg':
+        specifier: 4.1.4
+        version: 4.1.4(effect@4.1.4)
       '@incident/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@incident/prompts':
+        specifier: workspace:*
+        version: link:../../packages/prompts
+      '@incident/rag':
+        specifier: workspace:*
+        version: link:../../packages/rag
       '@incident/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
@@ -51,6 +60,12 @@ importers:
       '@effect/vitest':
         specifier: 4.1.4
         version: 4.1.4(effect@4.1.4)(vitest@5.1.0(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(jsdom@30.1.3)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)))
+      '@incident/mcp-observability':
+        specifier: workspace:*
+        version: link:../../packages/mcp-observability
+      '@incident/mcp-ops':
+        specifier: workspace:*
+        version: link:../../packages/mcp-ops
 
   apps/web:
     dependencies:

@@ -36,7 +36,7 @@ src/record/              flagd 注入、MCP 客户端、录制器、故障场景
 | `EVAL_AGENT=api EVAL_JUDGE=claude pnpm --filter @incident/evals eval:full`  | 同上                              | 约 21 美元（60 条）  |
 
 - 默认 `EVAL_AGENT=stub`、`EVAL_JUDGE=keyword`，直接跑 `promptfoo eval` 也不会花钱。
-- api 模式下 provider 把每条用例的快照写到 `EVAL_REPLAY_DIR`（默认 `.replay/`），api 连接的 mcp-observability 需以 `REPLAY_DIR=<该目录>` 启动并按用例 id 选快照。
+- api 模式下 provider 把每条用例的快照写到 `EVAL_REPLAY_DIR`（默认 `.replay/`）。api 需以 `OBS_REPLAY_DIR=<同一目录的绝对路径>` 启动：每次调查按告警 fingerprint（即用例 id）启动一个回放模式的 mcp-observability。步骤见 `apps/api/README.md`。
 - 预算守卫在 promptfoo 的 `beforeAll` 钩子里执行，绕过 pnpm 脚本也生效：月度上限 500 美元，当月用量（本地账本 `.ledger/` 与 `EVAL_MONTH_SPEND_USD` 取大者）加本次估算超过 80% 时拒绝全量评估，冒烟每月最多 50 次、全量 8 次。`pnpm --filter @incident/evals evals budget` 查看当月用量。
 
 ## 录制故障快照（在 Mac mini 上执行）
