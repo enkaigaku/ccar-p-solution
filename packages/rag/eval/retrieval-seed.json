@@ -1,0 +1,268 @@
+{
+  "description": "Seed retrieval set for the bundled corpus. Chunk ids are <sourceId>#<heading slug>; see src/chunking/Chunker.ts. The full ~100 case set lives in packages/evals.",
+  "cases": [
+    {
+      "id": "checkout-5xx",
+      "query": "checkout HighErrorRate firing, PlaceOrder returns 5xx",
+      "service": "checkout",
+      "relevant": ["runbooks/checkout.md#high-error-rate/diagnosis"]
+    },
+    {
+      "id": "checkout-failed-charge",
+      "query": "orders fail with 'failed to charge card' in checkout",
+      "relevant": ["runbooks/checkout.md#high-error-rate/diagnosis", "runbooks/payment.md#charge-failures/diagnosis"]
+    },
+    {
+      "id": "checkout-restart",
+      "query": "should I restart checkout when its error rate is high?",
+      "service": "checkout",
+      "relevant": ["runbooks/checkout.md#high-error-rate/mitigation"]
+    },
+    {
+      "id": "checkout-latency",
+      "query": "checkout p99 latency went up, which downstream call is slow",
+      "service": "checkout",
+      "relevant": ["runbooks/checkout.md#high-latency/diagnosis"]
+    },
+    {
+      "id": "checkout-timeouts",
+      "query": "raise checkout dependency timeouts to stop latency alerts",
+      "service": "checkout",
+      "relevant": ["runbooks/checkout.md#high-latency/mitigation"]
+    },
+    {
+      "id": "payment-flat-ratio",
+      "query": "payment Charge errors steady at exactly 50 percent",
+      "service": "payment",
+      "relevant": [
+        "runbooks/payment.md#charge-failures/diagnosis",
+        "postmortems/2026-09-payment-charge-failures.md#root-cause"
+      ]
+    },
+    {
+      "id": "payment-invalid-token",
+      "query": "log line Payment request failed. Invalid token",
+      "relevant": ["runbooks/payment.md#charge-failures/diagnosis"]
+    },
+    {
+      "id": "payment-revert",
+      "query": "how to stop payment charge failures caused by the flag",
+      "service": "payment",
+      "relevant": ["runbooks/payment.md#charge-failures/mitigation"]
+    },
+    {
+      "id": "payment-unreachable",
+      "query": "checkout gets connection refused UNAVAILABLE calling payment, payment has no spans",
+      "relevant": ["runbooks/payment.md#service-unreachable/diagnosis"]
+    },
+    {
+      "id": "payment-pm-symptoms",
+      "query": "past incident where half of checkouts failed but payment CPU and latency looked normal",
+      "corpora": ["postmortem"],
+      "relevant": [
+        "postmortems/2026-09-payment-charge-failures.md#symptoms",
+        "postmortems/2026-09-payment-charge-failures.md#summary"
+      ]
+    },
+    {
+      "id": "cart-storage",
+      "query": "EmptyCart span event Can't access cart storage",
+      "service": "cart",
+      "relevant": ["runbooks/cart.md#high-error-rate/diagnosis"]
+    },
+    {
+      "id": "cart-valkey",
+      "query": "cart RedisConnectionException valkey connection errors",
+      "relevant": ["runbooks/cart.md#high-error-rate/diagnosis"]
+    },
+    {
+      "id": "cart-readiness",
+      "query": "cart container unhealthy, process running but receiving no traffic",
+      "relevant": ["runbooks/cart.md#pod-not-ready/diagnosis", "postmortems/2026-08-cart-readiness.md#root-cause"]
+    },
+    {
+      "id": "cart-restart-no-help",
+      "query": "restarting cart did not fix add to cart failures",
+      "relevant": ["runbooks/cart.md#pod-not-ready/mitigation", "postmortems/2026-08-cart-readiness.md#root-cause"]
+    },
+    {
+      "id": "cart-cardinality",
+      "query": "otel.metric.overflow series appeared for get_cart latency metric",
+      "relevant": ["runbooks/cart.md#metric-cardinality-overflow"]
+    },
+    {
+      "id": "ad-errors",
+      "query": "GetAds failing RESOURCE_EXHAUSTED",
+      "service": "ad",
+      "relevant": ["runbooks/ad.md#high-error-rate/diagnosis"]
+    },
+    {
+      "id": "ad-severity",
+      "query": "how severe is an ad service outage, does the page still render",
+      "relevant": ["runbooks/ad.md#_intro", "runbooks/ad.md#high-error-rate/mitigation"]
+    },
+    {
+      "id": "ad-cpu",
+      "query": "ad container CPU at limit without more requests",
+      "service": "ad",
+      "relevant": ["runbooks/ad.md#high-cpu/diagnosis"]
+    },
+    {
+      "id": "ad-gc",
+      "query": "jvm.gc.duration frequent full collections, latency spikes in ad",
+      "relevant": [
+        "runbooks/ad.md#long-garbage-collection-pauses/diagnosis",
+        "postmortems/2026-11-ad-latency-gc.md#symptoms"
+      ]
+    },
+    {
+      "id": "ad-heap",
+      "query": "should we increase the JVM heap to fix GC pauses",
+      "service": "ad",
+      "relevant": [
+        "runbooks/ad.md#long-garbage-collection-pauses/mitigation",
+        "postmortems/2026-11-ad-latency-gc.md#root-cause"
+      ]
+    },
+    {
+      "id": "catalog-one-product",
+      "query": "GetProduct fails only for product OLJCESPC7Z",
+      "relevant": ["runbooks/product-catalog.md#errors-for-one-product/diagnosis"]
+    },
+    {
+      "id": "catalog-locks",
+      "query": "product catalog database queries waiting on locks, pg_locks granted false",
+      "relevant": [
+        "runbooks/product-catalog.md#slow-queries-and-lock-contention/diagnosis",
+        "postmortems/2026-11-product-catalog-lock-contention.md#root-cause"
+      ]
+    },
+    {
+      "id": "catalog-kill-sessions",
+      "query": "killing blocked database sessions only helps briefly",
+      "service": "product-catalog",
+      "relevant": [
+        "runbooks/product-catalog.md#slow-queries-and-lock-contention/mitigation",
+        "postmortems/2026-11-product-catalog-lock-contention.md#mitigation"
+      ]
+    },
+    {
+      "id": "checkout-slow-catalog",
+      "query": "checkout slow and most trace time is spent in GetProduct",
+      "relevant": [
+        "postmortems/2026-11-product-catalog-lock-contention.md#symptoms",
+        "runbooks/checkout.md#high-latency/diagnosis"
+      ]
+    },
+    {
+      "id": "reco-oom",
+      "query": "recommendation OOMKilled repeatedly, memory grows after each restart",
+      "relevant": [
+        "runbooks/recommendation.md#cache-failure-and-memory-growth/diagnosis",
+        "postmortems/2026-10-recommendation-oom.md#symptoms"
+      ]
+    },
+    {
+      "id": "reco-cache-miss",
+      "query": "app.cache_hit false on almost every recommendation request",
+      "service": "recommendation",
+      "relevant": ["runbooks/recommendation.md#cache-failure-and-memory-growth/diagnosis"]
+    },
+    {
+      "id": "reco-fix",
+      "query": "how to recover recommendation memory after cache failure",
+      "service": "recommendation",
+      "relevant": ["runbooks/recommendation.md#cache-failure-and-memory-growth/mitigation"]
+    },
+    {
+      "id": "email-leak",
+      "query": "email service memory keeps rising with every order",
+      "relevant": ["runbooks/email.md#memory-leak/diagnosis"]
+    },
+    {
+      "id": "email-orders-lost",
+      "query": "are orders lost when the confirmation email service is unhealthy",
+      "service": "email",
+      "relevant": ["runbooks/email.md#memory-leak/mitigation"]
+    },
+    {
+      "id": "kafka-lag",
+      "query": "Kafka consumer lag climbing for fraud-detection group on orders topic",
+      "relevant": [
+        "runbooks/fraud-detection.md#consumer-lag-rising/diagnosis",
+        "postmortems/2026-10-fraud-detection-consumer-lag.md#symptoms"
+      ]
+    },
+    {
+      "id": "kafka-only-one-group",
+      "query": "accounting has no lag but fraud detection lags",
+      "relevant": [
+        "runbooks/fraud-detection.md#consumer-lag-rising/diagnosis",
+        "postmortems/2026-10-fraud-detection-consumer-lag.md#symptoms"
+      ]
+    },
+    {
+      "id": "kafka-empty-group",
+      "query": "consumer group has zero members while the container is healthy",
+      "service": "fraud-detection",
+      "relevant": ["runbooks/fraud-detection.md#consumer-group-empty/diagnosis"]
+    },
+    {
+      "id": "kafka-lag-drain",
+      "query": "do we need to restart fraud detection after consumer lag",
+      "service": "fraud-detection",
+      "relevant": [
+        "runbooks/fraud-detection.md#consumer-lag-rising/mitigation",
+        "postmortems/2026-10-fraud-detection-consumer-lag.md#mitigation"
+      ]
+    },
+    {
+      "id": "frontend-images",
+      "query": "web shop HTML fast but images load slowly through envoy",
+      "relevant": ["runbooks/frontend.md#slow-page-loads/diagnosis"]
+    },
+    {
+      "id": "frontend-flood",
+      "query": "request rate on home page spiked from load generator user agent",
+      "relevant": ["runbooks/frontend.md#traffic-spike-on-the-home-page/diagnosis"]
+    },
+    {
+      "id": "frontend-scale",
+      "query": "should we scale frontend for the synthetic home page traffic",
+      "service": "frontend",
+      "relevant": ["runbooks/frontend.md#traffic-spike-on-the-home-page/mitigation"]
+    },
+    {
+      "id": "frontend-5xx",
+      "query": "frontend returns 5xx on product pages",
+      "service": "frontend",
+      "relevant": ["runbooks/frontend.md#high-error-rate"]
+    },
+    {
+      "id": "shipping-intl",
+      "query": "GetQuote slow only for international non-US addresses",
+      "relevant": ["runbooks/shipping.md#slow-international-quotes/diagnosis"]
+    },
+    {
+      "id": "triage-first",
+      "query": "unknown alert, what to check in the first five minutes",
+      "relevant": ["runbooks/general-triage.md#first-five-minutes"]
+    },
+    {
+      "id": "triage-insufficient",
+      "query": "logs and traces do not show a cause, what should the report say",
+      "relevant": ["runbooks/general-triage.md#when-evidence-is-insufficient"]
+    },
+    {
+      "id": "triage-prefer-flag",
+      "query": "prefer reverting a flag over restart or rollback",
+      "relevant": ["runbooks/general-triage.md#proposing-actions"]
+    },
+    {
+      "id": "pm-flag-annotations",
+      "query": "lesson learned: check feature flag changes before blaming the deployment",
+      "corpora": ["postmortem"],
+      "relevant": ["postmortems/2026-09-payment-charge-failures.md#lessons"]
+    }
+  ]
+}

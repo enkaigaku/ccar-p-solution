@@ -9,11 +9,13 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "rag": "node scripts/rag.ts"
   },
   "dependencies": {
-    "effect": "4.1.4",
-    "@incident/contracts": "workspace:*"
+    "@effect/sql-pg": "4.1.4",
+    "@incident/contracts": "workspace:*",
+    "effect": "4.1.4"
   },
   "devDependencies": {
     "@effect/vitest": "4.1.4"
