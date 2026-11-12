@@ -1,0 +1,21 @@
+{
+  "name": "@incident/evals",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Evaluation datasets, promptfoo config, fault injection and snapshot recording scripts.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "effect": "4.1.4",
+    "@incident/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4"
+  }
+}

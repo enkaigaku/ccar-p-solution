@@ -1,0 +1,21 @@
+{
+  "name": "@incident/rag",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Retriever and Ingestor implementations: chunking, pgvector + tsvector hybrid search, Voyage rerank.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "effect": "4.1.4",
+    "@incident/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4"
+  }
+}

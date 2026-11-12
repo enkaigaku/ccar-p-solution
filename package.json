@@ -1,0 +1,24 @@
+{
+  "name": "ccar-p-solution",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "dev:api": "pnpm --filter @incident/api dev"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.7",
+    "@types/node": "26.6.6",
+    "turbo": "2.11.11",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
+  }
+}
