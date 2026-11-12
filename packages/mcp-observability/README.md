@@ -29,7 +29,7 @@
 
 设置 `REPLAY_DIR` 后不访问任何后端，从录制快照返回结果：读取 `REPLAY_DIR/snapshot.json`，或 `REPLAY_DIR/$REPLAY_CASE/snapshot.json`。快照由 `packages/evals` 的录制器作为 MCP client 调用本 server 生成。匹配规则：去掉时间窗口、step、limit 后按工具的关键入参精确匹配（metrics 按 PromQL，logs 按 service+contains+level，trace 按 traceId，status/topology 按 service），未命中时 logs/status/topology 退化为 工具 + service；仍未命中返回空结果，trace 返回 "Trace not found"。
 
-快照 Schema 目前在 `src/ReplaySource.ts` 里临时定义，与 evals 工作包提交到 contracts 的 `ReplaySnapshot` 一致，那个 PR 合入后改为 import。
+快照格式与匹配键来自 contracts 的 `ReplaySnapshot`、`replayKey`、`replayFallbackKey`。
 
 ## 运行
 

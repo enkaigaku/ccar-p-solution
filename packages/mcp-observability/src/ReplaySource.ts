@@ -1,69 +1,18 @@
-import { ObservabilityTools } from "@incident/contracts"
+import {
+  type RecordedToolCall,
+  ReplaySnapshot,
+  replayFallbackKey,
+  replayKey,
+  type ToolCallRequest,
+} from "@incident/contracts"
 import { Effect, FileSystem, Layer, Path, Schema } from "effect"
 import { ToolError } from "./McpToolServer.ts"
 import { makeRef, TelemetrySource } from "./TelemetrySource.ts"
 
 /*
  * Replay mode (ADR 007): answer tool calls from a telemetry snapshot recorded during fault injection.
- *
- * TEMPORARY: the snapshot schema and matching keys below mirror the `ReplaySnapshot` contract that the
- * evals work package is adding to `@incident/contracts`. Once that lands, this file imports it instead.
+ * Snapshot format and matching keys are the `ReplaySnapshot` contract.
  */
-
-const call = <T extends string, I extends Schema.Top, O extends Schema.Top>(tool: T, io: { input: I; output: O }) =>
-  Schema.Struct({ tool: Schema.Literal(tool), input: io.input, output: io.output })
-
-export const RecordedToolCall = Schema.Union([
-  call("query_metrics", ObservabilityTools.query_metrics),
-  call("query_logs", ObservabilityTools.query_logs),
-  call("get_trace", ObservabilityTools.get_trace),
-  call("get_service_status", ObservabilityTools.get_service_status),
-  call("get_service_topology", ObservabilityTools.get_service_topology),
-])
-export type RecordedToolCall = typeof RecordedToolCall.Type
-
-export const ReplaySnapshot = Schema.Struct({
-  version: Schema.Literal(1),
-  caseId: Schema.String,
-  recordedAt: Schema.String,
-  window: Schema.Struct({ start: Schema.String, end: Schema.String }),
-  alert: Schema.Unknown,
-  calls: Schema.Array(RecordedToolCall),
-})
-export type ReplaySnapshot = typeof ReplaySnapshot.Type
-
-/** A tool name with its decoded input, as recorded or as received. */
-type PickCall<C> = C extends RecordedToolCall ? Pick<C, "tool" | "input"> : never
-export type ToolCall = PickCall<RecordedToolCall>
-
-/**
- * Exact matching key. Time window, step and limit are dropped: the agent never asks for exactly the
- * window that was recorded, and the snapshot already covers the incident window.
- */
-export const replayKey = (call: ToolCall): string => {
-  switch (call.tool) {
-    case "query_metrics":
-      return `${call.tool}:${call.input.promql.replace(/\s+/g, "")}`
-    case "query_logs":
-      return `${call.tool}:${call.input.service}|${call.input.contains ?? ""}|${call.input.level ?? ""}`
-    case "get_trace":
-      return `${call.tool}:${call.input.traceId}`
-    case "get_service_status":
-    case "get_service_topology":
-      return `${call.tool}:${call.input.service ?? ""}`
-  }
-}
-
-/** Looser key tried after an exact miss: same tool and service. Metrics and traces only match exactly. */
-export const replayFallbackKey = (call: ToolCall): string | undefined => {
-  switch (call.tool) {
-    case "query_metrics":
-    case "get_trace":
-      return undefined
-    default:
-      return `${call.tool}~${call.input.service ?? ""}`
-  }
-}
 
 export const ReplaySourceLayer = (location: { readonly dir: string; readonly caseId: string | undefined }) =>
   Layer.effect(
@@ -90,7 +39,7 @@ export const ReplaySourceLayer = (location: { readonly dir: string; readonly cas
         if (loose !== undefined && !fallback.has(loose)) fallback.set(loose, recorded)
       }
 
-      const lookup = (call: ToolCall): RecordedToolCall | undefined => {
+      const lookup = (call: ToolCallRequest): RecordedToolCall | undefined => {
         const loose = replayFallbackKey(call)
         return exact.get(replayKey(call)) ?? (loose === undefined ? undefined : fallback.get(loose))
       }

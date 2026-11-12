@@ -1,7 +1,8 @@
 import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
+import { ReplaySnapshot } from "@incident/contracts"
 import { Effect, FileSystem, Layer, Schema } from "effect"
-import { ReplaySnapshot, ReplaySourceLayer } from "../src/ReplaySource.ts"
+import { ReplaySourceLayer } from "../src/ReplaySource.ts"
 import { TelemetrySource } from "../src/TelemetrySource.ts"
 
 const recordedWindow = { start: "2026-11-12T05:00:00Z", end: "2026-11-12T05:15:00Z" }
@@ -12,7 +13,14 @@ const snapshot: typeof ReplaySnapshot.Encoded = {
   caseId: "payment-failure-01",
   recordedAt: "2026-11-12T05:16:00Z",
   window: recordedWindow,
-  alert: { labels: { alertname: "HighErrorRate", service: "payment" } },
+  alert: {
+    status: "firing",
+    labels: { alertname: "HighErrorRate", service: "payment" },
+    annotations: {},
+    startsAt: "2026-11-12T05:05:00Z",
+    endsAt: "0001-01-01T00:00:00Z",
+    fingerprint: "f1",
+  },
   calls: [
     {
       tool: "query_metrics",
@@ -68,7 +76,7 @@ describe("ReplaySource", () => {
     Effect.gen(function* () {
       const source = yield* withSnapshot("direct")
       const out = yield* source.queryMetrics({
-        promql: 'sum( rate(http_server_errors_total{service="payment"}[1m]) )',
+        promql: '  sum(rate(http_server_errors_total{service="payment"}[1m]))\n',
         ...agentWindow,
         stepSeconds: 60,
       })
