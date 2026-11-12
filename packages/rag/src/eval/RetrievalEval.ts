@@ -51,11 +51,15 @@ export const reciprocalRank = (
   return index === -1 ? 0 : 1 / (index + 1)
 }
 
-/** Runs every case through `search` and averages recall@k and MRR over cases. */
+/**
+ * Runs every case through `search` and averages recall@k and MRR over cases. Cases run one at a time
+ * by default, which keeps evaluation inside low provider rate limits.
+ */
 export const evaluateRetrieval = <E, R>(
   cases: ReadonlyArray<RetrievalCase>,
   search: (query: RetrievalQuery) => Effect.Effect<ReadonlyArray<Chunk>, E, R>,
   k = 8,
+  concurrency = 1,
 ): Effect.Effect<RetrievalMetrics, E, R> =>
   Effect.forEach(
     cases,
@@ -80,7 +84,7 @@ export const evaluateRetrieval = <E, R>(
           }
         }),
       ),
-    { concurrency: 4 },
+    { concurrency },
   ).pipe(
     Effect.map((results) => {
       const mean = (f: (r: CaseResult) => number) =>

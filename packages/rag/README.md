@@ -63,6 +63,12 @@ pnpm --filter @incident/rag rag prune 3           # 只保留最近 3 个非 act
 
 需要 `DATABASE_URL`；`ingest` / `eval` 不带 `--offline` 时还需要 `VOYAGE_API_KEY`。
 
+### Voyage 速率限制
+
+评估（`rag ingest` / `rag eval`）通过 `RagIndex.searchIn` 以 strict 模式检索：嵌入或 rerank 失败时直接报错，不会降级成纯全文检索，所以被限流时门禁不会用错误的分数放行。用例逐条执行，每条用例调用 2 次 Voyage。
+
+Voyage 账户没有绑定付款方式时速率限制很低（每分钟只有几次请求），评估会遇到 HTTP 429。在 Voyage 控制台绑定付款方式后限制会提高，免费 token 额度仍然有效。线上 `Retriever` 遇到 429 时仍会降级，并在 span 的 `rag.degraded` 上标记。
+
 ## 语料与检索集
 
 - `corpus/runbooks/`：OTel Demo 主要服务的 runbook（11 篇），按 flagd 故障场景组织诊断与处置步骤。

@@ -43,8 +43,21 @@ const queryHash = (text: string) => createHash("sha256").update(text).digest("he
  * Hybrid retrieval against one index version: vector and full-text search in parallel, RRF fusion,
  * then rerank. Embedding or rerank failures degrade (full-text only / fused order) instead of failing,
  * and the span records which path ran. Raw query text never goes into the span, only its hash.
+ *
+ * With `strict`, any degradation fails with `RetrievalError` instead. Evaluation uses it so that a
+ * rate-limited or misconfigured model can never pass the gate on full-text results alone.
  */
-export const hybridSearch = Effect.fn("rag.search")(function* (version: IndexVersionInfo, query: RetrievalQuery) {
+export const hybridSearch = Effect.fn("rag.search")(function* (
+  version: IndexVersionInfo,
+  query: RetrievalQuery,
+  options: { readonly strict?: boolean } = {},
+) {
+  const strict = options.strict === true
+  const strictFailure = (reason: string, error?: { readonly message: string }) =>
+    new RetrievalError({
+      message: `search degraded (${reason})${error === undefined ? "" : `: ${error.message}`}; strict mode refuses partial results`,
+      ...(error === undefined ? {} : { cause: error }),
+    })
   const store = yield* ChunkStore
   const embedder = yield* Embedder
   const reranker = yield* Reranker
@@ -63,19 +76,23 @@ export const hybridSearch = Effect.fn("rag.search")(function* (version: IndexVer
 
   const queryEmbedding: Option.Option<ReadonlyArray<number>> =
     embedder.model !== version.embeddingModel
-      ? yield* Effect.logError("query embedder does not match the index; vector search skipped").pipe(
-          Effect.annotateLogs({ indexModel: version.embeddingModel, embedderModel: embedder.model }),
-          Effect.tap(() => Effect.sync(() => degraded.push("embedding_model_mismatch"))),
-          Effect.as(Option.none()),
-        )
+      ? strict
+        ? yield* strictFailure(`embedding_model_mismatch: index ${version.embeddingModel}, embedder ${embedder.model}`)
+        : yield* Effect.logError("query embedder does not match the index; vector search skipped").pipe(
+            Effect.annotateLogs({ indexModel: version.embeddingModel, embedderModel: embedder.model }),
+            Effect.tap(() => Effect.sync(() => degraded.push("embedding_model_mismatch"))),
+            Effect.as(Option.none()),
+          )
       : yield* embedder.embed([query.text], "query").pipe(
           Effect.map((vectors) => Option.fromNullishOr(vectors[0])),
           Effect.catchTag("ModelProviderError", (error) =>
-            Effect.logWarning("query embedding failed; falling back to full-text search").pipe(
-              Effect.annotateLogs({ error: error.message, retryable: error.retryable }),
-              Effect.tap(() => Effect.sync(() => degraded.push("embedding_unavailable"))),
-              Effect.as(Option.none()),
-            ),
+            strict
+              ? Effect.fail(strictFailure("embedding_unavailable", error))
+              : Effect.logWarning("query embedding failed; falling back to full-text search").pipe(
+                  Effect.annotateLogs({ error: error.message, retryable: error.retryable }),
+                  Effect.tap(() => Effect.sync(() => degraded.push("embedding_unavailable"))),
+                  Effect.as(Option.none()),
+                ),
           ),
         )
 
@@ -121,11 +138,13 @@ export const hybridSearch = Effect.fn("rag.search")(function* (version: IndexVer
               }),
             ),
             Effect.catchTag("ModelProviderError", (error) =>
-              Effect.logWarning("rerank failed; returning fused order").pipe(
-                Effect.annotateLogs({ error: error.message, retryable: error.retryable }),
-                Effect.tap(() => Effect.sync(() => degraded.push("rerank_unavailable"))),
-                Effect.as(fused.slice(0, limit)),
-              ),
+              strict
+                ? Effect.fail(strictFailure("rerank_unavailable", error))
+                : Effect.logWarning("rerank failed; returning fused order").pipe(
+                    Effect.annotateLogs({ error: error.message, retryable: error.retryable }),
+                    Effect.tap(() => Effect.sync(() => degraded.push("rerank_unavailable"))),
+                    Effect.as(fused.slice(0, limit)),
+                  ),
             ),
           )
 

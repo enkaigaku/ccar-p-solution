@@ -227,6 +227,19 @@ describe("search", () => {
     }).pipe(Effect.provide(withModels(Layer.mergeAll(HashingEmbedderLayer, failingReranker)))),
   )
 
+  it.effect("searchIn (used by evaluation) fails instead of degrading when a model is unavailable", () =>
+    Effect.gen(function* () {
+      const report = yield* (yield* Ingestor).ingest([checkout, cart])
+      const error = yield* Effect.flip(
+        (yield* RagIndex).searchIn(report.indexVersion, new RetrievalQuery({ text: "valkey" })),
+      )
+      assert.include(error.message, "rerank_unavailable")
+      // The contract Retriever still degrades for live traffic.
+      const live = yield* (yield* Retriever).search(new RetrievalQuery({ text: "valkey" }))
+      assert.isAbove(live.length, 0)
+    }).pipe(Effect.provide(withModels(Layer.mergeAll(HashingEmbedderLayer, failingReranker)))),
+  )
+
   it.effect("returns contract chunks stamped with the index version", () =>
     Effect.gen(function* () {
       const report = yield* (yield* Ingestor).ingest([checkout])

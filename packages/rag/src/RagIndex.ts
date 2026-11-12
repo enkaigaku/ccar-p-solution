@@ -36,7 +36,10 @@ export class RagIndex extends Context.Service<
     readonly listVersions: Effect.Effect<ReadonlyArray<IndexVersionInfo>, RetrievalError>
     /** Activates a `ready` or `retired` version. Also the rollback path. */
     activate(version: string): Effect.Effect<void, RetrievalError>
-    /** Searches a specific version, active or not. Used to evaluate a candidate before activation. */
+    /**
+     * Searches a specific version, active or not, in strict mode: if the embedding or rerank model fails,
+     * the search fails instead of degrading. Used to evaluate a candidate before activation.
+     */
     searchIn(version: string, query: RetrievalQuery): Effect.Effect<ReadonlyArray<Chunk>, RetrievalError>
     /** Deletes all but the newest `keep` non-active versions. Returns the deleted versions. */
     prune(keep: number): Effect.Effect<ReadonlyArray<string>, RetrievalError>
@@ -195,7 +198,7 @@ const makeRagIndex = (options: RagOptions) =>
         }),
       searchIn: (version, query) =>
         versionInfo(version).pipe(
-          Effect.flatMap((info) => hybridSearch(info, query)),
+          Effect.flatMap((info) => hybridSearch(info, query, { strict: true })),
           Effect.provideContext(context),
         ),
       prune: (keep) =>

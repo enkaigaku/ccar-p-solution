@@ -82,7 +82,14 @@ const ingest = Effect.gen(function* () {
   yield* Console.log(
     `built ${report.indexVersion}: ${report.chunksWritten} embedded, ${report.chunksSkipped} reused, from ${docs.length} documents`,
   )
-  const candidate = yield* evaluateVersion(report.indexVersion)
+  const candidate = yield* evaluateVersion(report.indexVersion).pipe(
+    Effect.tapError((error) =>
+      Console.error(
+        `evaluation failed, ${report.indexVersion} left inactive: ${error.message}\n` +
+          "If Voyage returned HTTP 429, the account hit its rate limit; see README (Voyage rate limits).",
+      ),
+    ),
+  )
   yield* printMetrics("candidate", candidate)
   let baseline: RetrievalMetrics | undefined
   if (Option.isSome(active)) {

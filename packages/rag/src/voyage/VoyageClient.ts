@@ -68,9 +68,10 @@ const classify =
     return new ModelProviderError({ operation, message: "unexpected failure", retryable: false, cause: error })
   }
 
+/** 0.5 s, 1 s, 2 s, 4 s (jittered): enough to ride out a per-minute rate limit window partly. */
 const retryPolicy = {
-  schedule: Schedule.exponential("250 millis").pipe(Schedule.jittered),
-  times: 3,
+  schedule: Schedule.exponential("500 millis").pipe(Schedule.jittered),
+  times: 4,
   while: (error: ModelProviderError) => error.retryable,
 }
 
