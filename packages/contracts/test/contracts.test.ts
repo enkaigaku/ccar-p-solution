@@ -5,8 +5,11 @@ import {
   InvestigationEvent,
   ObservabilityTools,
   OpsTools,
+  ReplaySnapshot,
   RetrievalQuery,
   Retriever,
+  replayFallbackKey,
+  replayKey,
   StatusChanged,
 } from "../src/index.ts"
 
@@ -61,4 +64,70 @@ describe("Retriever stub", () => {
       assert.strictEqual(chunks[0]?.service, "checkout")
     }).pipe(Effect.provide(Retriever.layerStub)),
   )
+})
+
+describe("replay snapshot contract", () => {
+  const snapshot: typeof ReplaySnapshot.Encoded = {
+    version: 1,
+    caseId: "payment-failure-50",
+    recordedAt: "2026-11-12T03:10:00Z",
+    window: { start: "2026-11-12T02:55:00Z", end: "2026-11-12T03:10:00Z" },
+    alert: {
+      status: "firing",
+      labels: { alertname: "HighErrorRate", service: "checkout", severity: "critical" },
+      annotations: { summary: "checkout 5xx above 5%" },
+      startsAt: "2026-11-12T03:05:00Z",
+      endsAt: "0001-01-01T00:00:00Z",
+      fingerprint: "a1b2c3",
+    },
+    calls: [
+      {
+        tool: "query_logs",
+        input: { service: "payment", start: "2026-11-12T02:55:00Z", end: "2026-11-12T03:10:00Z", level: "error" },
+        output: {
+          ref: "logs:payment:1",
+          totalMatched: 3,
+          countsByLevel: { error: 3 },
+          topMessages: [{ pattern: "charge failed", count: 3 }],
+          samples: [{ ref: "logs:payment:1#0", timestamp: "2026-11-12T03:04:00Z", line: "charge failed" }],
+        },
+      },
+    ],
+  }
+
+  it("round-trips through JSON", () => {
+    const decoded = Schema.decodeUnknownSync(ReplaySnapshot)(snapshot)
+    assert.strictEqual(decoded.calls[0]?.tool, "query_logs")
+    const again = Schema.decodeUnknownSync(ReplaySnapshot)(
+      JSON.parse(JSON.stringify(Schema.encodeSync(ReplaySnapshot)(decoded))),
+    )
+    assert.deepStrictEqual(again, decoded)
+  })
+
+  it("rejects a call whose output does not match its tool", () => {
+    const broken = { ...snapshot, calls: [{ ...snapshot.calls[0], tool: "get_trace" }] }
+    assert.strictEqual(Schema.decodeUnknownResult(ReplaySnapshot)(broken)._tag, "Failure")
+  })
+
+  it("match keys ignore time ranges, limits and PromQL whitespace", () => {
+    const a = {
+      tool: "query_metrics",
+      input: { promql: "rate(x[1m])", start: "a", end: "b", stepSeconds: 15 },
+    } as const
+    const b = {
+      tool: "query_metrics",
+      input: { promql: "  rate(x[1m]) ", start: "c", end: "d", stepSeconds: 60 },
+    } as const
+    assert.strictEqual(replayKey(a), replayKey(b))
+    const metric = (promql: string) =>
+      ({ tool: "query_metrics", input: { promql, start: "a", end: "b", stepSeconds: 15 } }) as const
+    // Whitespace inside label values is significant.
+    assert.notStrictEqual(replayKey(metric('x{m="charge  failed"}')), replayKey(metric('x{m="charge failed"}')))
+    assert.strictEqual(replayKey(metric('x{m="a \\" b"}  ')), 'query_metrics|x{m="a \\" b"}')
+    assert.strictEqual(replayKey(metric("sum(\n  rate(x[1m])\n)")), "query_metrics|sum( rate(x[1m]) )")
+    assert.strictEqual(replayFallbackKey(a), undefined)
+    const logs = { tool: "query_logs", input: { service: "payment", start: "a", end: "b", limit: 5 } } as const
+    assert.strictEqual(replayKey(logs), "query_logs|payment||")
+    assert.strictEqual(replayFallbackKey({ ...logs, input: { ...logs.input, contains: "x" } }), "query_logs|payment")
+  })
 })

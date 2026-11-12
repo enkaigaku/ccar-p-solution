@@ -1,0 +1,282 @@
+{
+  "version": 1,
+  "caseId": "fc-5e1d0a03",
+  "recordedAt": "2026-11-12T03:05:00.000Z",
+  "window": {
+    "start": "2026-11-12T02:50:00.000Z",
+    "end": "2026-11-12T03:05:00.000Z"
+  },
+  "alert": {
+    "status": "firing",
+    "labels": {
+      "alertname": "HighLatency",
+      "service": "frontend",
+      "severity": "critical"
+    },
+    "annotations": {
+      "summary": "frontend p95 latency above 1s"
+    },
+    "startsAt": "2026-11-12T03:00:00.000Z",
+    "endsAt": "0001-01-01T00:00:00.000Z",
+    "fingerprint": "5e1d0a03"
+  },
+  "calls": [
+    {
+      "tool": "get_service_topology",
+      "input": {},
+      "output": {
+        "ref": "topology:fc-5e1d0a03",
+        "edges": [
+          {
+            "from": "frontend",
+            "to": "checkout",
+            "protocol": "grpc"
+          },
+          {
+            "from": "frontend",
+            "to": "cart",
+            "protocol": "grpc"
+          },
+          {
+            "from": "frontend",
+            "to": "ad",
+            "protocol": "grpc"
+          },
+          {
+            "from": "frontend",
+            "to": "product-catalog",
+            "protocol": "grpc"
+          },
+          {
+            "from": "frontend",
+            "to": "recommendation",
+            "protocol": "grpc"
+          },
+          {
+            "from": "checkout",
+            "to": "payment",
+            "protocol": "grpc"
+          },
+          {
+            "from": "checkout",
+            "to": "cart",
+            "protocol": "grpc"
+          },
+          {
+            "from": "checkout",
+            "to": "email",
+            "protocol": "http"
+          },
+          {
+            "from": "checkout",
+            "to": "shipping",
+            "protocol": "http"
+          },
+          {
+            "from": "shipping",
+            "to": "quote",
+            "protocol": "http"
+          },
+          {
+            "from": "checkout",
+            "to": "currency",
+            "protocol": "grpc"
+          },
+          {
+            "from": "recommendation",
+            "to": "product-catalog",
+            "protocol": "grpc"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "get_service_status",
+      "input": {},
+      "output": {
+        "ref": "status:fc-5e1d0a03",
+        "services": [
+          {
+            "name": "frontend",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "checkout",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "payment",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "cart",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "ad",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "product-catalog",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "recommendation",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "email",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "shipping",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "quote",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          },
+          {
+            "name": "currency",
+            "state": "running",
+            "restarts": 0,
+            "imageTag": "3.1.0"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "level": "error"
+      },
+      "output": {
+        "ref": "logs:fc-5e1d0a03:frontend",
+        "totalMatched": 0,
+        "countsByLevel": {
+          "info": 900
+        },
+        "topMessages": [],
+        "samples": []
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "ad",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "level": "error"
+      },
+      "output": {
+        "ref": "logs:fc-5e1d0a03:ad",
+        "totalMatched": 12,
+        "countsByLevel": {
+          "info": 900,
+          "warn": 12
+        },
+        "topMessages": [
+          {
+            "pattern": "",
+            "count": 12
+          }
+        ],
+        "samples": [
+          {
+            "ref": "logs:fc-5e1d0a03:ad#0",
+            "timestamp": "2026-11-12T03:00:00.000Z",
+            "line": "GC overhead high"
+          },
+          {
+            "ref": "logs:fc-5e1d0a03:ad#1",
+            "timestamp": "2026-11-12T03:01:00.000Z",
+            "line": "GC overhead high"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(process_cpu_time_seconds_total{service_name=\"ad\"}[1m]))",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "stepSeconds": 60
+      },
+      "output": {
+        "ref": "metrics:fc-5e1d0a03:ad-cpu",
+        "series": [
+          {
+            "labels": {
+              "service_name": "ad"
+            },
+            "min": 0.2,
+            "max": 1.9,
+            "avg": 1.22,
+            "last": 1.9,
+            "tail": [
+              ["2026-11-12T03:00:00.000Z", 0.2],
+              ["2026-11-12T03:01:00.000Z", 0.3],
+              ["2026-11-12T03:02:00.000Z", 1.8],
+              ["2026-11-12T03:03:00.000Z", 1.9],
+              ["2026-11-12T03:04:00.000Z", 1.9]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"frontend\"}[1m])))",
+        "start": "2026-11-12T02:50:00.000Z",
+        "end": "2026-11-12T03:05:00.000Z",
+        "stepSeconds": 60
+      },
+      "output": {
+        "ref": "metrics:fc-5e1d0a03:frontend-p95",
+        "series": [
+          {
+            "labels": {
+              "service_name": "frontend"
+            },
+            "min": 180,
+            "max": 1400,
+            "avg": 880.0,
+            "last": 1380,
+            "tail": [
+              ["2026-11-12T03:00:00.000Z", 180],
+              ["2026-11-12T03:01:00.000Z", 190],
+              ["2026-11-12T03:02:00.000Z", 1250],
+              ["2026-11-12T03:03:00.000Z", 1400],
+              ["2026-11-12T03:04:00.000Z", 1380]
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
