@@ -70,50 +70,120 @@ const splitBlocks = (body: string): Array<string> => {
   return blocks
 }
 
-/** Breaks a unit that alone exceeds the budget: first at sentence ends, then at a hard character limit. */
-const splitOversized = (unit: string, maxTokens: number): Array<string> => {
-  if (estimateTokens(unit) <= maxTokens) return [unit]
-  const sentences = unit.split(/(?<=[.!?。！？；;])\s*/u).filter((s) => s.trim().length > 0)
-  if (sentences.length > 1) return sentences.flatMap((s) => splitOversized(s, maxTokens))
-  const pieces: Array<string> = []
-  let piece = ""
-  for (const char of unit) {
-    if (estimateTokens(piece + char) > maxTokens) {
-      pieces.push(piece)
-      piece = ""
-    }
-    piece += char
-  }
-  if (piece.length > 0) pieces.push(piece)
-  return pieces
+/** A piece of a section body plus the original text that separated it from the previous piece. */
+interface Unit {
+  readonly text: string
+  readonly sep: string
 }
 
 /**
- * Packs blocks greedily into windows of at most `maxTokens`. Each new window starts with the trailing
- * units of the previous one, up to `overlapTokens`, so a step split across windows keeps its context.
+ * Sentence ends: Latin punctuation only when followed by whitespace (so URLs, decimals and dotted keys
+ * stay intact), CJK punctuation anywhere. The captured whitespace is kept to rebuild the original text.
+ */
+const SENTENCE_END = /(?<=[.!?;:])(\s+)|(?<=[。！？；])(\s*)/u
+
+const splitSentences = (text: string): Array<Unit> => {
+  const units: Array<Unit> = []
+  let rest = text
+  let sep = ""
+  for (;;) {
+    const match = SENTENCE_END.exec(rest)
+    if (match === null || match.index + match[0].length >= rest.length) break
+    const head = rest.slice(0, match.index)
+    if (head.length === 0) break
+    units.push({ text: head, sep })
+    sep = match[0]
+    rest = rest.slice(match.index + match[0].length)
+  }
+  units.push({ text: rest, sep })
+  return units
+}
+
+/** Splits at the last character that keeps `text` within `budget` tokens, preferring a whitespace boundary. */
+const splitHard = (text: string, budget: number): Array<Unit> => {
+  const units: Array<Unit> = []
+  let rest = text
+  while (estimateTokens(rest) > budget) {
+    let end = 0
+    let tokens = 0
+    for (const char of rest) {
+      const next = tokens + estimateTokens(char)
+      if (next > budget) break
+      tokens = next
+      end += char.length
+    }
+    const space = rest.lastIndexOf(" ", end)
+    const cut = space > end / 2 ? space + 1 : Math.max(end, 1)
+    units.push({ text: rest.slice(0, cut), sep: "" })
+    rest = rest.slice(cut)
+  }
+  if (rest.length > 0) units.push({ text: rest, sep: "" })
+  return units
+}
+
+/** Breaks a unit that alone exceeds `budget`: first at sentence ends, then at a hard limit. */
+const splitOversized = (unit: Unit, budget: number): Array<Unit> => {
+  if (estimateTokens(unit.text) <= budget) return [unit]
+  const sentences = splitSentences(unit.text)
+  const pieces =
+    sentences.length > 1 ? sentences.flatMap((s) => splitOversized(s, budget)) : splitHard(unit.text, budget)
+  // The first piece inherits the separator that preceded the whole unit.
+  return pieces.map((p, i) => (i === 0 ? { ...p, sep: unit.sep } : p))
+}
+
+/** The end of `text` worth at most `budget` tokens, starting at a word boundary when there is one. */
+const tailWithin = (text: string, budget: number): string => {
+  let start = text.length
+  let tokens = 0
+  while (start > 0) {
+    const next = tokens + estimateTokens(text[start - 1] ?? "")
+    if (next > budget) break
+    tokens = next
+    start--
+  }
+  if (start === 0) return text
+  const space = text.indexOf(" ", start)
+  return space !== -1 && space < text.length - 1 ? text.slice(space + 1) : text.slice(start)
+}
+
+const joinUnits = (units: ReadonlyArray<Unit>) => units.map((u, i) => (i === 0 ? u.text : u.sep + u.text)).join("")
+
+/**
+ * Packs units greedily into windows of at most `maxTokens`. Each new window starts with up to
+ * `overlapTokens` from the end of the previous window (whole units, then the tail of a longer one),
+ * so a step that straddles a boundary appears whole in at least one window. Units are first split to
+ * at most `maxTokens - overlapTokens`, which always leaves room for the overlap.
  */
 export const windowText = (body: string, params: ChunkParams): Array<string> => {
-  const units = splitBlocks(body).flatMap((block) => splitOversized(block, params.maxTokens))
-  const windows: Array<Array<string>> = []
-  let current: Array<string> = []
+  const budget = Math.max(params.maxTokens - params.overlapTokens, 1)
+  const units = splitBlocks(body).flatMap((block, i) =>
+    splitOversized({ text: block, sep: i === 0 ? "" : "\n\n" }, budget),
+  )
+  const windows: Array<string> = []
+  let current: Array<Unit> = []
   let tokens = 0
   let fresh = 0
   for (const unit of units) {
-    const size = estimateTokens(unit)
+    const size = estimateTokens(unit.text)
     if (fresh > 0 && tokens + size > params.maxTokens) {
-      windows.push(current)
-      const overlap: Array<string> = []
+      windows.push(joinUnits(current))
+      const overlap: Array<Unit> = []
       let overlapTokens = 0
-      for (let i = current.length - 1; i >= 0; i--) {
-        const candidate = current[i] ?? ""
-        const candidateTokens = estimateTokens(candidate)
-        if (
-          overlapTokens + candidateTokens > params.overlapTokens ||
-          overlapTokens + candidateTokens + size > params.maxTokens
-        )
-          break
-        overlap.unshift(candidate)
-        overlapTokens += candidateTokens
+      for (let i = current.length - 1; i >= 0 && overlapTokens < params.overlapTokens; i--) {
+        const candidate = current[i]
+        if (candidate === undefined) break
+        const candidateTokens = estimateTokens(candidate.text)
+        if (overlapTokens + candidateTokens <= params.overlapTokens) {
+          overlap.unshift(candidate)
+          overlapTokens += candidateTokens
+          continue
+        }
+        const tail = tailWithin(candidate.text, params.overlapTokens - overlapTokens)
+        if (tail.length > 0 && tail.length < candidate.text.length) {
+          overlap.unshift({ text: tail, sep: candidate.sep })
+          overlapTokens += estimateTokens(tail)
+        }
+        break
       }
       current = overlap
       tokens = overlapTokens
@@ -123,8 +193,8 @@ export const windowText = (body: string, params: ChunkParams): Array<string> => 
     tokens += size
     fresh++
   }
-  if (fresh > 0) windows.push(current)
-  return windows.map((w) => w.join("\n\n"))
+  if (fresh > 0) windows.push(joinUnits(current))
+  return windows
 }
 
 export const slugify = (text: string): string =>

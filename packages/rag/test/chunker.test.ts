@@ -125,6 +125,12 @@ kubectl rollout restart deploy/cart
   )
 })
 
+/** Length of the longest suffix of `a` that is also a prefix of `b`. */
+const overlapLength = (a: string, b: string) => {
+  for (let n = Math.min(a.length, b.length); n > 0; n--) if (a.endsWith(b.slice(0, n))) return n
+  return 0
+}
+
 describe("windowText", () => {
   const params = { ...defaultChunkParams.runbook, maxTokens: 50, overlapTokens: 15 }
 
@@ -138,8 +144,11 @@ describe("windowText", () => {
     assert.isAbove(windows.length, 1)
     for (const w of windows) assert.isAtMost(estimateTokens(w), params.maxTokens)
     for (let i = 1; i < windows.length; i++) {
-      const previousLast = windows[i - 1]?.split("\n\n").pop() ?? ""
-      assert.isTrue(windows[i]?.startsWith(previousLast), `window ${i} should start with the previous tail`)
+      assert.isAtLeast(
+        overlapLength(windows[i - 1] ?? "", windows[i] ?? ""),
+        20,
+        `window ${i} overlaps the previous one`,
+      )
     }
     // Every paragraph appears somewhere.
     for (const p of paragraphs) assert.isTrue(windows.some((w) => w.includes(p)))
@@ -149,6 +158,29 @@ describe("windowText", () => {
     const code = "```\nline a\n\nline b\n```"
     const windows = windowText(`${"intro ".repeat(30)}\n\n${code}`, params)
     assert.isTrue(windows.some((w) => w.includes(code)))
+  })
+
+  it("overlaps hard-split text without sentence boundaries (5000 CJK characters)", () => {
+    const text = Array.from({ length: 5000 }, (_, i) => String.fromCodePoint(0x4e00 + (i % 2000))).join("")
+    const windows = windowText(text, defaultChunkParams.runbook)
+    assert.isAbove(windows.length, 9)
+    for (const w of windows) assert.isAtMost(estimateTokens(w), 512)
+    for (let i = 1; i < windows.length; i++) {
+      assert.strictEqual(overlapLength(windows[i - 1] ?? "", windows[i] ?? ""), 64, `window ${i}`)
+    }
+    // Concatenating windows minus their overlaps rebuilds the original text.
+    const rebuilt = windows.map((w, i) => (i === 0 ? w : w.slice(overlapLength(windows[i - 1] ?? "", w)))).join("")
+    assert.strictEqual(rebuilt, text)
+  })
+
+  it("keeps URLs, decimals and dotted keys intact when splitting long paragraphs", () => {
+    const text = `${"prefix ".repeat(310)}https://example.com/path; next. Set app.cache.ttl to 2.5 seconds. ${"tail ".repeat(400)}`
+    const windows = windowText(text, defaultChunkParams.runbook)
+    assert.isAbove(windows.length, 1)
+    for (const w of windows) assert.notInclude(w, "example.\n")
+    assert.isTrue(windows.some((w) => w.includes("https://example.com/path;")))
+    assert.isTrue(windows.some((w) => w.includes("app.cache.ttl to 2.5 seconds.")))
+    for (const w of windows) assert.notInclude(w, "\n\n", "sentence splits keep their original whitespace")
   })
 
   it("hard-splits a single oversized paragraph", () => {
