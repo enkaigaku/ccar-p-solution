@@ -1,0 +1,26 @@
+{
+  "name": "@incident/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Effect HttpApi server: alert webhook, investigation orchestration, approvals, SSE.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "dev": "node --watch src/main.ts",
+    "start": "node src/main.ts"
+  },
+  "dependencies": {
+    "effect": "4.1.4",
+    "@effect/platform-node": "4.1.4",
+    "@incident/contracts": "workspace:*",
+    "@anthropic-ai/sdk": "1.8.0",
+    "@modelcontextprotocol/sdk": "1.32.2"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4"
+  }
+}

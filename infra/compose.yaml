@@ -1,0 +1,23 @@
+# Project services for local development. Runs on the developer's Mac (OrbStack).
+# The OpenTelemetry Demo (the system being operated) is started separately: see scripts/otel-demo.sh.
+name: incident-copilot
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg17
+    environment:
+      POSTGRES_USER: incident
+      POSTGRES_PASSWORD: incident
+      POSTGRES_DB: incident
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U incident -d incident"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  pgdata:

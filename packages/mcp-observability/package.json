@@ -1,0 +1,22 @@
+{
+  "name": "@incident/mcp-observability",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Read-only MCP server: metrics, logs, traces, service status. Includes replay mode and PII redaction.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "effect": "4.1.4",
+    "@incident/contracts": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.2"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4"
+  }
+}

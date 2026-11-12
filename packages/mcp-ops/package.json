@@ -1,0 +1,22 @@
+{
+  "name": "@incident/mcp-ops",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Write MCP server: flag toggle, restart, rollback. Every call requires a valid approval token.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "effect": "4.1.4",
+    "@incident/contracts": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.2"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4"
+  }
+}
