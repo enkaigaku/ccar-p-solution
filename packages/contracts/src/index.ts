@@ -1,6 +1,7 @@
 export * from "./api/IncidentApi.ts"
 export * from "./domain/Alert.ts"
 export * from "./domain/Approval.ts"
+export * from "./domain/ApprovalSigning.ts"
 export * from "./domain/Chunk.ts"
 export * from "./domain/Events.ts"
 export * from "./domain/Investigation.ts"
