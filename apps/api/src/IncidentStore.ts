@@ -41,6 +41,7 @@ export class IncidentStore extends Context.Service<
     getInvestigation(id: InvestigationId): Effect.Effect<Investigation, InvestigationNotFound>
     listProposals(id: InvestigationId): Effect.Effect<ReadonlyArray<ActionProposal>, InvestigationNotFound>
     addFeedback(id: InvestigationId, feedback: Feedback): Effect.Effect<void, InvestigationNotFound>
+    listFeedback(id: InvestigationId): Effect.Effect<ReadonlyArray<Feedback>, InvestigationNotFound>
     addProposal(proposal: ActionProposal): Effect.Effect<void, InvestigationNotFound>
     decide(id: ProposalId, decision: Decision): Effect.Effect<ActionProposal, ProposalNotFound | ProposalNotPending>
   }
@@ -127,6 +128,11 @@ export class IncidentStore extends Context.Service<
                 feedback: new Map([...s.feedback, [id, [...(s.feedback.get(id) ?? []), feedback]]]),
               })),
             ),
+          ),
+        listFeedback: (id) =>
+          requireInvestigation(id).pipe(
+            Effect.andThen(Ref.get(state)),
+            Effect.map((s) => s.feedback.get(id) ?? []),
           ),
         addProposal: (proposal) =>
           requireInvestigation(proposal.investigationId).pipe(

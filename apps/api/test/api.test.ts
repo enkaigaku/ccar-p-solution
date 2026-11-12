@@ -1,5 +1,5 @@
 import { assert, layer } from "@effect/vitest"
-import { ActionProposal, IncidentApi, InvestigationId, ProposalId, ToggleFlag } from "@incident/contracts"
+import { ActionProposal, Feedback, IncidentApi, InvestigationId, ProposalId, ToggleFlag } from "@incident/contracts"
 import { DateTime, Effect, Layer } from "effect"
 import { HttpServer } from "effect/http"
 import { HttpApiTest } from "effect/http-api"
@@ -49,6 +49,41 @@ layer(Layer.mergeAll(HandlersLayer.pipe(Layer.provideMerge(IncidentStore.layerMe
         const client = yield* makeClient
         const error = yield* client.investigations
           .get({ params: { id: InvestigationId.make("missing") } })
+          .pipe(Effect.flip)
+        assert.strictEqual(error._tag, "InvestigationNotFound")
+      }),
+    )
+
+    it.effect("appends feedback to an existing investigation", () =>
+      Effect.gen(function* () {
+        const client = yield* makeClient
+        const store = yield* IncidentStore
+        const { accepted } = yield* client.alerts.webhook({ payload: webhook })
+        const investigation = yield* client.investigations.start({ payload: { alertId: accepted[0]! } })
+
+        yield* client.investigations.feedback({
+          params: { id: investigation.id },
+          payload: new Feedback({ rating: "down" }),
+        })
+        yield* client.investigations.feedback({
+          params: { id: investigation.id },
+          payload: new Feedback({ rating: "up", actualRootCause: "paymentFailure flag enabled" }),
+        })
+
+        const feedback = yield* store.listFeedback(investigation.id)
+        assert.deepStrictEqual(
+          feedback.map((f) => f.rating),
+          ["down", "up"],
+        )
+        assert.strictEqual(feedback[1]?.actualRootCause, "paymentFailure flag enabled")
+      }),
+    )
+
+    it.effect("rejects feedback for an unknown investigation", () =>
+      Effect.gen(function* () {
+        const client = yield* makeClient
+        const error = yield* client.investigations
+          .feedback({ params: { id: InvestigationId.make("missing") }, payload: new Feedback({ rating: "up" }) })
           .pipe(Effect.flip)
         assert.strictEqual(error._tag, "InvestigationNotFound")
       }),
