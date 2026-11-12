@@ -1,5 +1,5 @@
 import { NodeRuntime, NodeServices } from "@effect/platform-node"
-import { Console, Duration, Effect, Layer, Path } from "effect"
+import { Console, DateTime, Duration, Effect, Layer } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
 import { BudgetGuard, BudgetPolicy } from "./budget/Budget.ts"
 import { Datasets, packageRoot } from "./dataset/Datasets.ts"
@@ -93,8 +93,8 @@ const calibrateCommand = Command.make(
     const estimate = samples.length * BudgetPolicy.perCaseUsd.judge
     if (!yes) return yield* Console.log(`${samples.length} samples, about $${estimate.toFixed(2)}; rerun with --yes`)
     const guard = yield* BudgetGuard
-    const path = yield* Path.Path
-    const label = `calibrate:${path.basename(packageRoot)}:${samples.length}`
+    // Unique per execution, shared by this run's reserve and settle.
+    const label = `calibrate:${DateTime.formatIso(yield* DateTime.now)}:${samples.length}`
     yield* guard.reserve("smoke", estimate, label)
     const report = yield* calibrate(samples).pipe(Effect.provide(Judge.layerClaude))
     yield* guard.settle(label, report.costUsd)

@@ -5,7 +5,7 @@ import { EvalSettings, runtime } from "./runtime.ts"
 /**
  * promptfoo extension hooks (`extensions: [file://src/promptfoo/hooks.ts:beforeAll, ...:afterAll]`).
  * `beforeAll` reserves the estimated cost and aborts the run when the budget rules forbid it, so the guard
- * also applies when someone runs `promptfoo eval` directly. `afterAll` replaces the estimate with the measured cost.
+ * also applies when someone runs `promptfoo eval` directly. `afterAll` replaces the estimate with what the run cost (see `settledCost`).
  */
 interface SuiteContext {
   readonly suite: { readonly tests?: ReadonlyArray<unknown> }
@@ -35,21 +35,32 @@ export const beforeAll = (context: SuiteContext): Promise<void> =>
     }),
   )
 
-/** Provider cost plus the judge cost the `rootCause` assertion records in its metadata. */
-export const measuredCost = (results: ReadonlyArray<ResultLike>): number =>
-  results.reduce((sum, result) => {
-    const judge = (result.gradingResult?.componentResults ?? []).reduce((acc, component) => {
-      const cost = component.metadata?.judgeCostUsd
-      return acc + (typeof cost === "number" ? cost : 0)
-    }, 0)
-    return sum + (result.cost ?? 0) + judge
-  }, 0)
+/**
+ * What a finished run cost. Judge cost is measured by the `rootCause` assertion. Investigation cost is measured only
+ * when the provider reports it; the api agent does not yet (M2), so its share of the estimate is kept rather than
+ * settling a paid run at $0.
+ */
+export const settledCost = (results: ReadonlyArray<ResultLike>, agent: "stub" | "api"): number => {
+  const judge = results.reduce(
+    (sum, result) =>
+      sum +
+      (result.gradingResult?.componentResults ?? []).reduce((acc, component) => {
+        const cost = component.metadata?.judgeCostUsd
+        return acc + (typeof cost === "number" ? cost : 0)
+      }, 0),
+    0,
+  )
+  const provider = results.reduce((sum, result) => sum + (result.cost ?? 0), 0)
+  const investigation = provider > 0 ? provider : estimateUsd({ cases: results.length, agent, judge: "keyword" })
+  return judge + investigation
+}
 
 export const afterAll = (context: { readonly results: ReadonlyArray<ResultLike> }): Promise<void> =>
   runtime.runPromise(
     Effect.gen(function* () {
       if (reservation === undefined) return
-      const cost = measuredCost(context.results)
+      const { agent } = yield* EvalSettings
+      const cost = settledCost(context.results, agent)
       yield* (yield* BudgetGuard).settle(reservation, cost)
       yield* Effect.logInfo(`budget: run cost $${cost.toFixed(2)}`)
     }),

@@ -120,10 +120,13 @@ export class BudgetGuard extends Context.Service<
         })
 
       const month = Effect.map(read, (entries): MonthState => {
-        // A settled run appears twice (estimate, then measurement); the last entry per label wins.
+        // A settled run appears twice (estimate, then measurement): the last entry per label is its cost, and the
+        // first (the reservation) counts the run, so settling a run at $0 never un-counts it.
         const latest = new Map(entries.map((e) => [e.label, e]))
+        const reserved = new Map<string, LedgerEntry>()
+        for (const e of entries) if (!reserved.has(e.label)) reserved.set(e.label, e)
         const ledgerSpend = [...latest.values()].reduce((sum, e) => sum + e.usd, 0)
-        const count = (mode: EvalMode) => [...latest.values()].filter((e) => e.mode === mode && e.usd > 0).length
+        const count = (mode: EvalMode) => [...reserved.values()].filter((e) => e.mode === mode && e.usd > 0).length
         return {
           spentUsd: Math.max(
             ledgerSpend,

@@ -3,7 +3,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { ConfigProvider, Effect, FileSystem, Layer } from "effect"
 import { BudgetGuard, decide, estimateUsd } from "../src/budget/Budget.ts"
 import { costOf } from "../src/budget/pricing.ts"
-import { measuredCost } from "../src/promptfoo/hooks.ts"
+import { settledCost } from "../src/promptfoo/hooks.ts"
 
 const month = (spentUsd: number, smoke = 0, full = 0) => ({ spentUsd, runs: { smoke, full } })
 
@@ -44,13 +44,21 @@ describe("budget rules", () => {
     assert.closeTo(usd, 4 + 2 + 0.2 + 5, 1e-9)
   })
 
-  it("sums provider and judge cost from promptfoo results", () => {
-    const total = measuredCost([
-      { cost: 0.3, gradingResult: { componentResults: [{ metadata: { judgeCostUsd: 0.05 } }, {}] } },
-      { cost: 0.2, gradingResult: null },
-      {},
-    ])
+  it("settles judge cost plus measured provider cost", () => {
+    const total = settledCost(
+      [
+        { cost: 0.3, gradingResult: { componentResults: [{ metadata: { judgeCostUsd: 0.05 } }, {}] } },
+        { cost: 0.2, gradingResult: null },
+      ],
+      "api",
+    )
     assert.closeTo(total, 0.55, 1e-9)
+  })
+
+  it("keeps the investigation estimate when the api agent reports no cost", () => {
+    const results = [{ gradingResult: { componentResults: [{ metadata: { judgeCostUsd: 0.05 } }] } }, {}]
+    assert.closeTo(settledCost(results, "api"), 0.05 + 2 * 0.3, 1e-9)
+    assert.closeTo(settledCost(results, "stub"), 0.05, 1e-9)
   })
 })
 
@@ -69,9 +77,12 @@ describe("BudgetGuard ledger", () => {
         yield* guard.settle("smoke:a", 2.1)
         yield* guard.reserve("full", 21, "full:b")
         yield* guard.reserve("smoke", 0, "smoke:free")
+        // A paid run settled at $0 still counts towards the run limit.
+        yield* guard.reserve("smoke", 3.5, "smoke:d")
+        yield* guard.settle("smoke:d", 0)
         const state = yield* guard.month
         assert.closeTo(state.spentUsd, 23.1, 1e-9)
-        assert.deepStrictEqual(state.runs, { smoke: 1, full: 1 })
+        assert.deepStrictEqual(state.runs, { smoke: 2, full: 1 })
       }).pipe(Effect.provide(guardIn(dir)))
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
