@@ -8,3 +8,4 @@ coverage/
 infra/.otel-demo/
 packages/evals/.cache/
 .DS_Store
+infra/.ops-state/
