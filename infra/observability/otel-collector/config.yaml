@@ -1,0 +1,113 @@
+# Gateway collector for Incident Copilot. Receives OTLP from the api, the MCP servers and the
+# OpenTelemetry Demo's own collector, and fans out to Tempo, Loki and Prometheus.
+# Component names follow collector-contrib 0.159.0 (otlp_grpc, otlp_http, span_metrics, ...), the
+# same release the OTel Demo 3.1.0 pins.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+
+  # Security rule 5, enforced a second time here: prompt and tool-result text never reaches the
+  # trace backend even if a client is switched to the SDK's `content` mode by mistake. Hashes
+  # (incident.prompt.sha256, incident.tool.result_sha256) are kept.
+  transform/drop_genai_content:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - delete_key(attributes, "gen_ai.system_instructions")
+          - delete_key(attributes, "gen_ai.input.messages")
+          - delete_key(attributes, "gen_ai.output.messages")
+          - delete_key(attributes, "gen_ai.tool.call.arguments")
+          - delete_key(attributes, "gen_ai.tool.call.result")
+          - delete_key(attributes, "anthropic.tool_result.content")
+
+  # Security rule 6 safety net: mask attribute values whose key looks like a credential.
+  redaction/credentials:
+    allow_all_keys: true
+    blocked_key_patterns:
+      - "(?i)api[._-]?key"
+      - "(?i)authorization"
+      - "(?i)password"
+      - "(?i)secret"
+      - "(?i)approval[._-]?token"
+    summary: silent
+
+  # Span metrics only for Incident Copilot's own spans. The demo collector already computes span
+  # metrics for the demo services and forwards them; computing them again here would duplicate them.
+  filter/incident_only:
+    error_mode: ignore
+    traces:
+      span:
+        - 'resource.attributes["service.namespace"] != "incident-copilot"'
+
+connectors:
+  # Latency SLOs (triage p95 <= 5s, first report p95 <= 90s) are read from these histograms:
+  # incident_span_metrics_duration_bucket{span_name="incident.investigation"}, in milliseconds.
+  span_metrics:
+    namespace: incident.span.metrics
+    histogram:
+      unit: ms
+      explicit:
+        buckets: [50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s, 10s, 20s, 30s, 60s, 90s, 120s, 180s, 300s]
+    dimensions:
+      - name: incident.llm.step
+    exemplars:
+      enabled: true
+
+  # Service topology for the demo and for Incident Copilot itself:
+  # traces_service_graph_request_total{client, server}. mcp-observability reads it for the
+  # dependency map and Grafana's Tempo datasource uses it for the service graph view.
+  # Uses the long-standing type name `servicegraph`: the demo config never uses this connector, so
+  # a snake_case alias on 0.159.0 is unverified.
+  servicegraph:
+    latency_histogram_buckets: [10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s, 10s]
+    dimensions: []
+    store:
+      ttl: 10s
+      max_items: 10000
+
+exporters:
+  otlp_grpc/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+    sending_queue:
+      batch:
+  otlp_http/loki:
+    endpoint: http://loki:3100/otlp
+    sending_queue:
+      batch:
+  otlp_http/prometheus:
+    endpoint: http://prometheus:9090/api/v1/otlp
+    sending_queue:
+      batch:
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/drop_genai_content, redaction/credentials]
+      exporters: [otlp_grpc/tempo, servicegraph]
+    traces/span_metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/incident_only]
+      exporters: [span_metrics]
+    metrics:
+      receivers: [otlp, span_metrics, servicegraph]
+      processors: [memory_limiter]
+      exporters: [otlp_http/prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter]
+      exporters: [otlp_http/loki]

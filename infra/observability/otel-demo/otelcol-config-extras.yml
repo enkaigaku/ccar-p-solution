@@ -1,0 +1,35 @@
+# Copied over the OTel Demo's src/otel-collector/otelcol-config-extras.yml by
+# infra/scripts/otel-demo.sh. Loaded last on top of the demo's core otelcol-config.yml (demo 3.1.0,
+# collector-contrib 0.159.0).
+#
+# Forwards all demo telemetry to Incident Copilot's otel-gateway, which writes it to Tempo, Loki
+# and Prometheus. The collector replaces arrays when merging config files, so every exporter list
+# below is complete: `span_metrics` must stay in the traces pipeline because the core metrics
+# pipeline reads from it.
+
+# The core config binds the OTLP receiver to `otel-collector:4317`. Once compose.extras.yaml puts
+# the collector on a second network, that hostname can resolve to its address on our network
+# instead of the demo's, and demo services get "connection refused". Listen on all interfaces.
+# (Maps merge across config files, so the core receiver's CORS settings are kept.)
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:${env:OTEL_COLLECTOR_PORT_GRPC}
+      http:
+        endpoint: 0.0.0.0:${env:OTEL_COLLECTOR_PORT_HTTP}
+
+exporters:
+  otlp_http/incident:
+    endpoint: http://otel-gateway:4318
+    sending_queue:
+      batch:
+
+service:
+  pipelines:
+    traces:
+      exporters: [span_metrics, otlp_http/incident]
+    metrics:
+      exporters: [otlp_http/incident]
+    logs:
+      exporters: [otlp_http/incident]

@@ -1,0 +1,25 @@
+# Metrics arrive over OTLP from the gateway collector (--web.enable-otlp-receiver); nothing is
+# scraped except Prometheus itself.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+otlp:
+  # Predictable names: dots become underscores and no unit or _total suffix is added, so
+  # `incident.llm.cost_usd` is queried as `incident_llm_cost_usd` (see packages/telemetry Conventions.ts).
+  translation_strategy: UnderscoreEscapingWithoutSuffixes
+  promote_resource_attributes:
+    - service.name
+    - service.namespace
+    - service.instance.id
+    - deployment.environment.name
+
+storage:
+  tsdb:
+    # Several collectors (demo + gateway) batch independently, so samples can arrive a little late.
+    out_of_order_time_window: 30m
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

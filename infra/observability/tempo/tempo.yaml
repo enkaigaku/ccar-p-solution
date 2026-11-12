@@ -1,0 +1,30 @@
+# Tempo 3.1 single binary with local storage. Span metrics and the service graph are computed by
+# the gateway collector, so Tempo's metrics generator stays off.
+stream_over_http_enabled: true
+
+server:
+  http_listen_port: 3200
+  log_level: warn
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+# Tempo 3 removed the `compactor` block; retention is set on the backend worker.
+backend_worker:
+  compaction:
+    block_retention: 168h # 7 days is enough for a demo; the Postgres audit table keeps 90 days
+
+usage_report:
+  reporting_enabled: false

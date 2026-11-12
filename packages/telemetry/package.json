@@ -12,6 +12,19 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
+    "@effect/opentelemetry": "4.1.4",
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/api-logs": "0.223.1",
+    "@opentelemetry/exporter-logs-otlp-http": "0.223.1",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.223.1",
+    "@opentelemetry/exporter-trace-otlp-http": "0.223.1",
+    "@opentelemetry/resources": "2.12.1",
+    "@opentelemetry/sdk-logs": "0.223.1",
+    "@opentelemetry/sdk-metrics": "2.12.1",
+    "@opentelemetry/sdk-trace-base": "2.12.1",
+    "@opentelemetry/sdk-trace-node": "2.12.1",
+    "@opentelemetry/semantic-conventions": "1.45.0",
     "effect": "4.1.4"
   },
   "devDependencies": {
