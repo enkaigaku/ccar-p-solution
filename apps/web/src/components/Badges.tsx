@@ -18,12 +18,25 @@ const connectionLabel: Record<Connection, string> = {
   error: "连接中断",
 }
 
-export function ConnectionIndicator({ connection, message }: { connection: Connection; message?: string | undefined }) {
+export function ConnectionIndicator({
+  connection,
+  message,
+  onReconnect,
+}: {
+  connection: Connection
+  message?: string | undefined
+  onReconnect?: () => void
+}) {
   return (
     <span className={`connection connection-${connection}`} title={message}>
       <span className="dot" aria-hidden="true" />
       {connectionLabel[connection]}
       {message === undefined ? null : `：${message}`}
+      {connection === "error" && onReconnect !== undefined ? (
+        <button type="button" onClick={onReconnect}>
+          重新连接
+        </button>
+      ) : null}
     </span>
   )
 }

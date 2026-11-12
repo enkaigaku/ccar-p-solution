@@ -72,6 +72,15 @@ describe("live investigation reducer", () => {
     expect(state.status).toBe("awaiting_approval")
   })
 
+  it("keeps a decided proposal's status when its creation event is replayed", () => {
+    const state = apply(
+      initialState(investigation({ status: "awaiting_approval" }), [proposal({ status: "approved" })]),
+      event(ProposalCreated.make({ investigationId, proposal: proposal() })),
+    )
+    expect(state.proposals.map((p) => p.status)).toEqual(["approved"])
+    expect(state.timeline.map((i) => i.entry._tag)).toEqual(["Proposal"])
+  })
+
   it("flags low confidence for insufficient information or a weak top hypothesis", () => {
     expect(isLowConfidence("insufficient_information", [hypothesis("a", 0.9)])).toBe(true)
     expect(isLowConfidence("completed", [hypothesis("a", 0.3), hypothesis("b", 0.45)])).toBe(true)

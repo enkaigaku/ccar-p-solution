@@ -43,6 +43,26 @@ describe("liveInvestigation", () => {
     }).pipe(Effect.provide(appLayer(http)))
   })
 
+  it.effect("keeps polling through a transient upstream failure", () => {
+    let polls = 0
+    const http = fakeHttp((_, url) => {
+      if (url.pathname.endsWith("/events")) return new Response(null, { status: 404 })
+      if (url.pathname.endsWith("/proposals")) return json([])
+      polls += 1
+      if (polls === 2) return json({ _tag: "UpstreamUnavailable" }, 502)
+      return json(encodeInvestigation(investigation({ status: polls < 4 ? "running" : "completed" })))
+    })
+    const actions: Array<LiveAction> = []
+    return Effect.gen(function* () {
+      const fiber = yield* liveInvestigation(investigationId, (a) => actions.push(a)).pipe(Effect.forkChild)
+      yield* TestClock.adjust("1 minute")
+      yield* Fiber.join(fiber)
+      assert.ok(actions.every((a) => !(a._tag === "Connection" && a.connection === "error")))
+      const last = actions.at(-1)
+      assert.strictEqual(last?._tag === "Snapshot" ? last.investigation.status : undefined, "completed")
+    }).pipe(Effect.provide(appLayer(http)))
+  })
+
   it.effect("streams events and stops at a terminal status, then settles with a snapshot", () => {
     const http = fakeHttp((_, url) => {
       if (url.pathname.endsWith("/events")) {

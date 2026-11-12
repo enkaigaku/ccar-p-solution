@@ -115,7 +115,15 @@ const applyEvent = (state: LiveState, event: InvestigationEvent, receivedAt: Dat
     case "HypothesisUpdated":
       return { ...state, timeline, hypotheses: event.hypotheses }
     case "ProposalCreated":
-      return { ...state, timeline, proposals: upsertProposal(state.proposals, event.proposal) }
+      // A creation event only adds a proposal we have not seen. On replay it must not overwrite a newer
+      // status (approved, executed, ...) that came from a snapshot or a decision made on this page.
+      return {
+        ...state,
+        timeline,
+        proposals: state.proposals.some((p) => p.id === event.proposal.id)
+          ? state.proposals
+          : [...state.proposals, event.proposal],
+      }
     case "StatusChanged":
       return {
         ...state,

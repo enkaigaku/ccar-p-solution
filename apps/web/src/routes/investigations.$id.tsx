@@ -52,7 +52,7 @@ function InvestigationPage({
   investigation: Investigation
   proposals: ReadonlyArray<ActionProposal>
 }) {
-  const [state, dispatch] = useLiveInvestigation(investigation, proposals)
+  const [state, dispatch, reconnect] = useLiveInvestigation(investigation, proposals)
   const lowConfidence = isLowConfidence(state.status, state.hypotheses)
   const current = state.investigation
 
@@ -101,7 +101,11 @@ function InvestigationPage({
         </div>
         <div className="status-block">
           <StatusBadge status={state.status} />
-          <ConnectionIndicator connection={state.connection} message={state.connectionMessage} />
+          <ConnectionIndicator
+            connection={state.connection}
+            message={state.connectionMessage}
+            onReconnect={reconnect}
+          />
         </div>
       </div>
 
