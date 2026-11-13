@@ -11,7 +11,9 @@ OTEL_DEMO_VERSION="3.1.0"
 here="$(cd "$(dirname "$0")/.." && pwd)"
 dir="$here/.otel-demo"
 extras="$here/observability/otel-demo"
-compose=(docker compose -f compose.yaml -f compose.extras.yaml)
+# The project name is fixed here, not left to the directory name, because mcp-observability and mcp-ops find the
+# demo's containers by it (OTEL_DEMO_COMPOSE_PROJECT, default "otel-demo").
+compose=(docker compose -p otel-demo -f compose.yaml -f compose.extras.yaml)
 
 # The demo's .env pins DEMO_VERSION=latest, which pulls images built from the demo's main branch
 # while the compose file and collector config come from the tag. Those drift apart (main's

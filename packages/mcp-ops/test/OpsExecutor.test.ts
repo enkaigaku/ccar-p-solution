@@ -41,7 +41,7 @@ const setup = Effect.gen(function* () {
           Layer.succeed(
             OpsConfig,
             OpsConfig.of({
-              composeProject: "opentelemetry-demo",
+              composeProject: "otel-demo",
               demoDir: dir,
               composeFiles: ["compose.yaml", "compose.extras.yaml"],
               flagdConfigPath,
@@ -86,7 +86,7 @@ describe("OpsExecutor", () => {
       yield* executor.restartService("checkout")
       const [ps, restart] = yield* Ref.get(calls)
       assert.isTrue(ps?.includes("label=com.docker.compose.service=checkout"))
-      assert.isTrue(ps?.includes("label=com.docker.compose.project=opentelemetry-demo"))
+      assert.isTrue(ps?.includes("label=com.docker.compose.project=otel-demo"))
       assert.deepStrictEqual(restart, ["restart", "c0ffee"])
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
@@ -104,7 +104,7 @@ describe("OpsExecutor", () => {
       assert.deepStrictEqual(up.slice(0, 9), [
         "compose",
         "--project-name",
-        "opentelemetry-demo",
+        "otel-demo",
         "--project-directory",
         dir,
         "--file",

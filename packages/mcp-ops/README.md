@@ -45,7 +45,7 @@ OPS_DRY_RUN=true APPROVAL_SIGNING_KEY=... npx @modelcontextprotocol/inspector no
 | ---------------------------------- | ------------------------------------------ | ---------------------------------------- |
 | `APPROVAL_SIGNING_KEY`             | 必填                                       | ≥ 32 字符，与 api 共用                   |
 | `OTEL_DEMO_DIR`                    | `infra/.otel-demo`                         | `otel-demo.sh` 克隆的 demo 目录          |
-| `OTEL_DEMO_COMPOSE_PROJECT`        | `opentelemetry-demo`                       | compose 项目名                           |
+| `OTEL_DEMO_COMPOSE_PROJECT`        | `otel-demo`                                | compose 项目名                           |
 | `OTEL_DEMO_COMPOSE_FILES`          | `compose.yaml,compose.extras.yaml`         | 与 `otel-demo.sh` 一致，不存在的文件跳过 |
 | `FLAGD_CONFIG_PATH`                | `$OTEL_DEMO_DIR/src/flagd/demo.flagd.json` |                                          |
 | `OPS_STATE_DIR`                    | `infra/.ops-state`                         | 回滚覆盖文件与审计日志（已 gitignore）   |
