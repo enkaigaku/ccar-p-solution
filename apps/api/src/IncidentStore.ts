@@ -27,7 +27,10 @@ const emptyState: State = { alerts: new Map(), investigations: new Map(), propos
 
 /** Fields the orchestrator changes while an investigation runs; `updatedAt` is set by the store. */
 export type InvestigationPatch = Partial<
-  Pick<Investigation, "status" | "hypotheses" | "promptVersion" | "indexVersion" | "model" | "traceId">
+  Pick<
+    Investigation,
+    "status" | "hypotheses" | "promptVersion" | "indexVersion" | "model" | "traceId" | "retrievedChunkIds" | "usage"
+  >
 >
 
 const ACTIVE: ReadonlySet<Investigation["status"]> = new Set(["queued", "running", "awaiting_approval"])

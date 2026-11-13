@@ -1,6 +1,7 @@
 import { Alert, AlertId } from "@incident/contracts"
 import { DateTime } from "effect"
 import type { TriageResult } from "../src/triage/Triage.ts"
+import { emptyUsage } from "../src/usage.ts"
 
 export const window = { start: "2026-11-12T02:45:00Z", end: "2026-11-12T03:05:00Z" }
 
@@ -25,6 +26,7 @@ export const checkoutTriage: TriageResult = {
   relatedAlertIds: [],
   source: "model",
   promptVersion: "triage@1",
+  usage: emptyUsage,
 }
 
 export const webhook = {

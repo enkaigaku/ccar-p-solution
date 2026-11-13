@@ -1,10 +1,11 @@
-import { type Alert, Severity } from "@incident/contracts"
+import { type Alert, type InvestigationUsage, Severity } from "@incident/contracts"
 import { AlertCategories, type AlertCategory, TriagePrompt } from "@incident/prompts"
 import { annotatePrompt, recordClaudeResponse, SpanName } from "@incident/telemetry"
-import { Context, Effect, Layer, Schema } from "effect"
+import { Context, Effect, Layer, Ref, Schema } from "effect"
 import { AuditLog } from "../audit/AuditLog.ts"
 import { ClaudeClient, responseText } from "../claude/ClaudeClient.ts"
 import { canonicalJson, untrusted } from "../prompting.ts"
+import { addUsage, emptyUsage } from "../usage.ts"
 
 export const TriageModel = "claude-haiku-5-5"
 
@@ -37,6 +38,8 @@ export interface TriageResult extends TriageOutput {
   /** `model` when Haiku classified the alert, `fallback` when the label-based heuristic did. */
   readonly source: "model" | "fallback"
   readonly promptVersion: string
+  /** Model usage of the triage call; also set when the call succeeded but its answer was unusable. */
+  readonly usage: InvestigationUsage
 }
 
 const decode = Schema.decodeUnknownEffect(Schema.fromJsonString(TriageOutput))
@@ -63,6 +66,7 @@ export const fallbackTriage = (alert: Alert): TriageResult => {
     relatedAlertIds: [],
     source: "fallback",
     promptVersion: "triage-fallback",
+    usage: emptyUsage,
   }
 }
 
@@ -103,7 +107,11 @@ export class Triage extends Context.Service<
       const claude = yield* ClaudeClient
       const audit = yield* AuditLog
 
-      const viaModel = Effect.fnUntraced(function* (alert: Alert, firing: ReadonlyArray<Alert>) {
+      const viaModel = Effect.fnUntraced(function* (
+        alert: Alert,
+        firing: ReadonlyArray<Alert>,
+        spent: Ref.Ref<InvestigationUsage>,
+      ) {
         const user = renderTriageRequest(alert, firing)
         yield* annotatePrompt({ step: "triage", promptVersion: TriagePrompt.version, renderedPrompt: user })
         yield* audit.append({ kind: "llm_request", subject: TriageModel, payload: user })
@@ -115,7 +123,8 @@ export class Triage extends Context.Service<
           system: [{ type: "text", text: TriagePrompt.text, cache_control: { type: "ephemeral" } }],
           messages: [{ role: "user", content: user }],
         })
-        yield* recordClaudeResponse({ step: "triage", requestedModel: TriageModel }, response)
+        const cost = yield* recordClaudeResponse({ step: "triage", requestedModel: TriageModel }, response)
+        yield* Ref.update(spent, (total) => addUsage(total, response.usage, cost))
         if (response.stop_reason !== "end_turn") {
           return yield* new TriageFailed({ message: `triage stopped with ${response.stop_reason}` })
         }
@@ -128,17 +137,23 @@ export class Triage extends Context.Service<
           relatedAlertIds: output.relatedAlertIds.filter((id) => id !== alert.id && known.has(id)),
           source: "model",
           promptVersion: TriagePrompt.version,
+          usage: yield* Ref.get(spent),
         } satisfies TriageResult
       })
 
       const triage = (alert: Alert, firing: ReadonlyArray<Alert>) =>
-        viaModel(alert, firing).pipe(
-          Effect.catch((error) =>
-            Effect.logWarning("Triage fell back to label heuristics").pipe(
-              Effect.annotateLogs({ reason: error._tag }),
-              Effect.as(fallbackTriage(alert)),
+        Effect.gen(function* () {
+          const spent = yield* Ref.make(emptyUsage)
+          return yield* viaModel(alert, firing, spent).pipe(
+            Effect.catch((error) =>
+              Effect.logWarning("Triage fell back to label heuristics").pipe(
+                Effect.annotateLogs({ reason: error._tag }),
+                Effect.andThen(Ref.get(spent)),
+                Effect.map((usage) => ({ ...fallbackTriage(alert), usage })),
+              ),
             ),
-          ),
+          )
+        }).pipe(
           Effect.tap((result) =>
             Effect.annotateCurrentSpan({
               "incident.triage.category": result.category,

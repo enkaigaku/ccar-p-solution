@@ -44,6 +44,7 @@ describe("Triage", () => {
         ),
       ])
       assert.strictEqual(result.source, "model")
+      assert.isAbove(result.usage.outputTokens, 0)
       assert.strictEqual(result.category, "error-rate")
       assert.deepStrictEqual([...result.relatedAlertIds], ["fp-payment-1"])
       const request = requests[0] ?? {}
@@ -63,6 +64,8 @@ describe("Triage", () => {
       ]) {
         const { result } = yield* run([bad])
         assert.strictEqual(result.source, "fallback")
+        // A call that returned an unusable answer still counts toward the usage.
+        if (bad.status === undefined) assert.isAbove(result.usage.inputTokens, 0)
         assert.strictEqual(result.category, "error-rate")
         assert.strictEqual(result.service, "checkout")
       }

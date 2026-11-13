@@ -114,6 +114,8 @@ describe("IncidentApi", () => {
         assert.strictEqual(done.model, "claude-opus-5-5")
         assert.strictEqual(done.promptVersion, "investigate@1+method-error-rate@1")
         assert.strictEqual(done.hypotheses[0]?.evidence[0]?.ref, "logs-payment#0")
+        assert.include(done.retrievedChunkIds ?? [], "stub-runbook-1")
+        assert.isAbove(done.usage?.costUsd ?? 0, 0)
         assert.isDefined(done.traceId)
 
         const proposals = yield* client.investigations.proposals({ params: { id: started.id } })

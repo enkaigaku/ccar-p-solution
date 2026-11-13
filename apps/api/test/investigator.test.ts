@@ -78,7 +78,8 @@ describe("Investigator", () => {
       assert.strictEqual(report.promptVersion, "investigate@1+method-error-rate@1")
       assert.strictEqual(report.indexVersion, "stub")
       assert.deepStrictEqual([...report.retrievedChunkIds], ["stub-postmortem-1", "stub-runbook-1"])
-      assert.isAbove(report.costUsd, 0)
+      assert.isAbove(report.usage.costUsd, 0)
+      assert.isAbove(report.usage.outputTokens, 0)
 
       // Request shape: model routing, effort, fallbacks, structured output, cache breakpoints.
       const first = requests[0] ?? {}

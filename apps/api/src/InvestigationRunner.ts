@@ -22,6 +22,7 @@ import { ApprovalExecutor } from "./approval/ApprovalExecutor.ts"
 import { InvestigationEvents } from "./events/InvestigationEvents.ts"
 import { IncidentStore } from "./IncidentStore.ts"
 import { Triage } from "./triage/Triage.ts"
+import { sumUsage } from "./usage.ts"
 
 export const RunnerConfig = Config.all({
   /** Investigations running at the same time; the rest wait in `queued`. */
@@ -88,6 +89,8 @@ export class InvestigationRunner extends Context.Service<
           promptVersion: report.promptVersion,
           indexVersion: report.indexVersion,
           model: report.model,
+          retrievedChunkIds: report.retrievedChunkIds,
+          usage: sumUsage(triaged.usage, report.usage),
         })
         yield* events.publish(new HypothesisUpdated({ investigationId: id, hypotheses: report.hypotheses }))
 
@@ -110,7 +113,11 @@ export class InvestigationRunner extends Context.Service<
         const status: InvestigationStatus =
           report.status === "completed" && report.proposals.length > 0 ? "awaiting_approval" : report.status
         yield* setStatus(id, status)
-        yield* recordInvestigationOutcome({ status, costUsd: report.costUsd, toolCalls: report.toolCalls })
+        yield* recordInvestigationOutcome({
+          status,
+          costUsd: triaged.usage.costUsd + report.usage.costUsd,
+          toolCalls: report.toolCalls,
+        })
         yield* Effect.annotateCurrentSpan({
           "incident.investigation.status": status,
           "incident.investigation.turns": report.turns,

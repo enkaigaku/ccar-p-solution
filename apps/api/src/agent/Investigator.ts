@@ -6,6 +6,7 @@ import {
   EvidenceRef,
   Hypothesis,
   type InvestigationId,
+  type InvestigationUsage,
   ObservabilityTools,
   OpsAction,
   RetrievalQuery,
@@ -23,6 +24,7 @@ import type { McpSession } from "../mcp/McpSession.ts"
 import { ObservabilityGateway } from "../mcp/ObservabilityGateway.ts"
 import { canonicalJson, documents, untrusted } from "../prompting.ts"
 import type { TriageResult } from "../triage/Triage.ts"
+import { addUsage, emptyUsage } from "../usage.ts"
 import { agentTools, isObservabilityTool, PROPOSE_ACTION, ReportJsonSchema, SEARCH_KNOWLEDGE } from "./tools.ts"
 
 export const InvestigationModel = "claude-opus-5-5"
@@ -62,7 +64,8 @@ export interface InvestigationReport {
   readonly indexVersion: string
   /** The model that served the last turn (differs from the requested one after a fallback). */
   readonly model: string
-  readonly costUsd: number
+  /** Usage of the agent's own turns (triage is counted separately). */
+  readonly usage: InvestigationUsage
   readonly toolCalls: number
   readonly turns: number
   readonly retrievedChunkIds: ReadonlyArray<string>
@@ -198,7 +201,7 @@ export class Investigator extends Context.Service<
         const chunkIds = new Set<string>()
         const citable: Citable = { telemetry: telemetryRefs, chunks: chunkIds }
         const proposals: Array<ProposalDraft> = []
-        const cost = yield* Ref.make(0)
+        const cost = yield* Ref.make(emptyUsage)
         let toolCalls = 0
         let indexVersion = "none"
         let servedModel = InvestigationModel
@@ -385,7 +388,10 @@ export class Investigator extends Context.Service<
         let finalizing = false
         let repaired = false
         const budgetSpent = Ref.get(cost).pipe(
-          Effect.map((spent) => ({ spent, over: turn >= settings.maxTurns || spent >= settings.maxCostUsd })),
+          Effect.map(({ costUsd: spent }) => ({
+            spent,
+            over: turn >= settings.maxTurns || spent >= settings.maxCostUsd,
+          })),
         )
         const budgetNotice: Anthropic.Beta.BetaTextBlockParam = {
           type: "text",
@@ -419,7 +425,7 @@ export class Investigator extends Context.Service<
           const response = yield* claude.create(params).pipe(
             Effect.tap((r) =>
               recordClaudeResponse({ step: "investigate", requestedModel: InvestigationModel }, r).pipe(
-                Effect.flatMap((c) => Ref.update(cost, (total) => total + Option.getOrElse(c, () => 0))),
+                Effect.flatMap((c) => Ref.update(cost, (total) => addUsage(total, r.usage, c))),
               ),
             ),
             Effect.mapError((e) => new InvestigationFailed({ reason: "model", message: e.message })),
@@ -511,7 +517,7 @@ export class Investigator extends Context.Service<
                 promptVersion,
                 indexVersion,
                 model: servedModel,
-                costUsd: yield* Ref.get(cost),
+                usage: yield* Ref.get(cost),
                 toolCalls,
                 turns: turn,
                 retrievedChunkIds: [...chunkIds].toSorted(),
