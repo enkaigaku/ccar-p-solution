@@ -71,19 +71,28 @@ export const ReplaySourceLayer = (location: { readonly dir: string; readonly cas
             ? Effect.succeed(hit.output)
             : Effect.fail(new ToolError({ message: "Trace not found" }))
         },
+        // A per-service call that was not recorded is answered from the recorded unfiltered call, filtered the way
+        // the live source filters. The recorded ref is kept: the data comes from that recorded result.
         getServiceStatus: (input) => {
           const hit = lookup({ tool: "get_service_status", input })
+          if (hit?.tool === "get_service_status") return Effect.succeed(hit.output)
+          const all = input.service === undefined ? undefined : lookup({ tool: "get_service_status", input: {} })
           return Effect.succeed(
-            hit?.tool === "get_service_status"
-              ? hit.output
+            all?.tool === "get_service_status"
+              ? { ref: all.output.ref, services: all.output.services.filter((s) => s.name === input.service) }
               : { ref: makeRef("get_service_status", input), services: [] },
           )
         },
         getServiceTopology: (input) => {
           const hit = lookup({ tool: "get_service_topology", input })
+          if (hit?.tool === "get_service_topology") return Effect.succeed(hit.output)
+          const all = input.service === undefined ? undefined : lookup({ tool: "get_service_topology", input: {} })
           return Effect.succeed(
-            hit?.tool === "get_service_topology"
-              ? hit.output
+            all?.tool === "get_service_topology"
+              ? {
+                  ref: all.output.ref,
+                  edges: all.output.edges.filter((e) => e.from === input.service || e.to === input.service),
+                }
               : { ref: makeRef("get_service_topology", input), edges: [] },
           )
         },

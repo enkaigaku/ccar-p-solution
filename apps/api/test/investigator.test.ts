@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { InvestigationId, Retriever } from "@incident/contracts"
 import { Effect, Layer } from "effect"
-import { type AgentSettings, Investigator } from "../src/agent/Investigator.ts"
+import { type AgentSettings, Investigator, isEmptyResult } from "../src/agent/Investigator.ts"
 import { AuditLog } from "../src/audit/AuditLog.ts"
 import { ObservabilityGateway } from "../src/mcp/ObservabilityGateway.ts"
 import { checkoutAlert, checkoutTriage, goodReport, toggleProposal, window } from "./fixtures.ts"
@@ -219,6 +219,44 @@ describe("Investigator", () => {
       if (truncated.outcome._tag === "Failure") assert.strictEqual(truncated.outcome.failure.reason, "max_tokens")
     }),
   )
+
+  it.effect("returns empty results to the model but does not let the report cite them", () =>
+    Effect.gen(function* () {
+      const cited = (ref: string) => ({ kind: "log", ref, note: "" })
+      const report = (refs: ReadonlyArray<string>) =>
+        jsonText({
+          status: "completed",
+          hypotheses: [{ summary: "payment fails", confidence: 0.8, evidence: refs.map(cited) }],
+        })
+      const { outcome, requests } = yield* run([
+        reply("tool_use", [
+          toolUse("t1", "query_logs", { service: "valkey", start: window.start, end: window.end }),
+          toolUse("t2", "query_logs", { service: "payment", start: window.start, end: window.end }),
+        ]),
+        reply("end_turn", [report(["logs-payment#0", "logs-valkey"])]),
+        reply("end_turn", [report(["logs-payment#0", "logs-valkey"])]),
+      ])
+      assert.include(userMessages(requests[1] ?? {}), "must not be cited")
+      // The empty result's ref triggers the repair round and is then dropped.
+      assert.include(userMessages(requests[2] ?? {}), "log:logs-valkey")
+      assert.strictEqual(outcome._tag, "Success")
+      if (outcome._tag !== "Success") return
+      assert.deepStrictEqual(
+        outcome.success.hypotheses[0]?.evidence.map((e) => e.ref),
+        ["logs-payment#0"],
+      )
+    }),
+  )
+
+  it("classifies empty tool results", () => {
+    assert.isTrue(isEmptyResult({ ref: "m", series: [] }))
+    assert.isFalse(isEmptyResult({ ref: "m", series: [{}] }))
+    assert.isTrue(isEmptyResult({ ref: "l", totalMatched: 0, samples: [] }))
+    assert.isFalse(isEmptyResult({ ref: "l", totalMatched: 3, samples: [] }))
+    assert.isTrue(isEmptyResult({ ref: "s", services: [] }))
+    assert.isTrue(isEmptyResult({ ref: "t", edges: [] }))
+    assert.isFalse(isEmptyResult({ ref: "x", traceId: "abc", spans: [] }))
+  })
 
   it.effect("returns tool errors to the model instead of failing", () =>
     Effect.gen(function* () {
