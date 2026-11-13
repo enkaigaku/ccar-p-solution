@@ -1,4 +1,10 @@
-import { IncidentApi, InvestigationId, type ReplaySnapshot } from "@incident/contracts"
+import {
+  type ActionProposal,
+  IncidentApi,
+  type Investigation,
+  InvestigationId,
+  type ReplaySnapshot,
+} from "@incident/contracts"
 import { Clock, Config, Context, Duration, Effect, FileSystem, flow, Layer, Path, Schedule, Schema } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http"
 import { HttpApiClient } from "effect/http-api"
@@ -70,22 +76,7 @@ export class AgentUnderTest extends Context.Service<
           )
           const proposals = yield* client.investigations.proposals({ params: { id } })
           const finishedAt = yield* Clock.currentTimeMillis
-          return new AgentRun({
-            status: done.status === "queued" || done.status === "running" ? "failed" : done.status,
-            hypotheses: done.hypotheses.map((h) => ({
-              summary: h.summary,
-              confidence: h.confidence,
-              evidence: h.evidence.map((e) => ({ kind: e.kind, ref: e.ref })),
-            })),
-            proposals: proposals.map((p) => p.action),
-            // Not exposed by IncidentApi yet; chunk citations fail until it is (tracked for M2 integration).
-            retrievedChunkIds: [],
-            // Cost comes from traces in M2; until then the budget guard keeps its estimate.
-            usage: { costUsd: 0, inputTokens: 0, outputTokens: 0 },
-            latencyMs: finishedAt - startedAt,
-            model: done.model,
-            promptVersion: done.promptVersion,
-          })
+          return toAgentRun(done, proposals, finishedAt - startedAt)
         },
         (effect, c) =>
           Effect.mapError(effect, (cause) => new AgentError({ caseId: c.id, message: String(cause), cause })),
@@ -95,6 +86,28 @@ export class AgentUnderTest extends Context.Service<
     }),
   ).pipe(Layer.provide(FetchHttpClient.layer))
 }
+
+/** Maps the api's finished investigation to the run that the graders score. */
+export const toAgentRun = (
+  done: Investigation,
+  proposals: ReadonlyArray<ActionProposal>,
+  latencyMs: number,
+): AgentRun =>
+  new AgentRun({
+    status: done.status === "queued" || done.status === "running" ? "failed" : done.status,
+    hypotheses: done.hypotheses.map((h) => ({
+      summary: h.summary,
+      confidence: h.confidence,
+      evidence: h.evidence.map((e) => ({ kind: e.kind, ref: e.ref })),
+    })),
+    proposals: proposals.map((p) => p.action),
+    // Chunk citations are checked against these; an api that has not retrieved reports none.
+    retrievedChunkIds: done.retrievedChunkIds ?? [],
+    usage: done.usage ?? { costUsd: 0, inputTokens: 0, outputTokens: 0 },
+    latencyMs,
+    model: done.model,
+    promptVersion: done.promptVersion,
+  })
 
 /**
  * Heuristic baseline: blame the service with the most error logs and cite that log result.

@@ -25,25 +25,49 @@ interface State {
 
 const emptyState: State = { alerts: new Map(), investigations: new Map(), proposals: new Map(), feedback: new Map() }
 
+/** Fields the orchestrator changes while an investigation runs; `updatedAt` is set by the store. */
+export type InvestigationPatch = Partial<
+  Pick<
+    Investigation,
+    "status" | "hypotheses" | "promptVersion" | "indexVersion" | "model" | "traceId" | "retrievedChunkIds" | "usage"
+  >
+>
+
+const ACTIVE: ReadonlySet<Investigation["status"]> = new Set(["queued", "running", "awaiting_approval"])
+
 const toSeverity = (label: string | undefined): Severity =>
   label === "critical" || label === "warning" ? label : "info"
 
 /**
- * In-memory persistence for M0, so `apps/web` can develop against a working API.
- * Replaced by a Postgres-backed layer with the same interface in M2.
+ * In-memory persistence. A Postgres-backed layer with the same interface replaces it once the business and audit
+ * tables land; until then a restart forgets alerts and investigations.
  */
 export class IncidentStore extends Context.Service<
   IncidentStore,
   {
     ingestWebhook(payload: AlertmanagerWebhook): Effect.Effect<ReadonlyArray<AlertId>>
     listAlerts(): Effect.Effect<ReadonlyArray<Alert>>
+    getAlert(id: AlertId): Effect.Effect<Alert, AlertNotFound>
+    /** Creates a `queued` investigation. Orchestration is `InvestigationRunner`'s job. */
     startInvestigation(alertId: AlertId): Effect.Effect<Investigation, AlertNotFound>
+    /** The newest investigation of this alert that has not reached a terminal status, if any. */
+    findActiveInvestigation(alertId: AlertId): Effect.Effect<Option.Option<Investigation>>
     getInvestigation(id: InvestigationId): Effect.Effect<Investigation, InvestigationNotFound>
+    updateInvestigation(
+      id: InvestigationId,
+      patch: InvestigationPatch,
+    ): Effect.Effect<Investigation, InvestigationNotFound>
     listProposals(id: InvestigationId): Effect.Effect<ReadonlyArray<ActionProposal>, InvestigationNotFound>
     addFeedback(id: InvestigationId, feedback: Feedback): Effect.Effect<void, InvestigationNotFound>
     listFeedback(id: InvestigationId): Effect.Effect<ReadonlyArray<Feedback>, InvestigationNotFound>
     addProposal(proposal: ActionProposal): Effect.Effect<void, InvestigationNotFound>
+    getProposal(id: ProposalId): Effect.Effect<ActionProposal, ProposalNotFound>
     decide(id: ProposalId, decision: Decision): Effect.Effect<ActionProposal, ProposalNotFound | ProposalNotPending>
+    /** Records the outcome of executing an approved proposal. */
+    setProposalStatus(
+      id: ProposalId,
+      status: "executed" | "failed" | "expired",
+    ): Effect.Effect<ActionProposal, ProposalNotFound>
   }
 >()("@incident/api/IncidentStore") {
   static readonly layerMemory = Layer.effect(
@@ -101,6 +125,31 @@ export class IncidentStore extends Context.Service<
         return investigation
       })
 
+      const updateInvestigation = Effect.fn("IncidentStore.updateInvestigation")(function* (
+        id: InvestigationId,
+        patch: InvestigationPatch,
+      ) {
+        const current = yield* requireInvestigation(id)
+        const updated = new Investigation({ ...current, ...patch, updatedAt: yield* DateTime.now })
+        yield* Ref.update(state, (s) => ({ ...s, investigations: new Map([...s.investigations, [id, updated]]) }))
+        return updated
+      })
+
+      const requireProposal = Effect.fnUntraced(function* (id: ProposalId) {
+        const found = (yield* Ref.get(state)).proposals.get(id)
+        if (found === undefined) return yield* new ProposalNotFound({ id })
+        return found
+      })
+
+      const setProposalStatus = Effect.fn("IncidentStore.setProposalStatus")(function* (
+        id: ProposalId,
+        status: "executed" | "failed" | "expired",
+      ) {
+        const updated = new ActionProposal({ ...(yield* requireProposal(id)), status })
+        yield* Ref.update(state, (s) => ({ ...s, proposals: new Map([...s.proposals, [id, updated]]) }))
+        return updated
+      })
+
       const decide = Effect.fn("IncidentStore.decide")(function* (id: ProposalId, decision: Decision) {
         const proposal = (yield* Ref.get(state)).proposals.get(id)
         if (proposal === undefined) return yield* new ProposalNotFound({ id })
@@ -113,8 +162,24 @@ export class IncidentStore extends Context.Service<
       return IncidentStore.of({
         ingestWebhook,
         listAlerts: () => Ref.get(state).pipe(Effect.map((s) => [...s.alerts.values()])),
+        getAlert: (id) =>
+          Ref.get(state).pipe(
+            Effect.flatMap((s) => {
+              const alert = s.alerts.get(id)
+              return alert === undefined ? Effect.fail(new AlertNotFound({ id })) : Effect.succeed(alert)
+            }),
+          ),
         startInvestigation,
+        findActiveInvestigation: (alertId) =>
+          Ref.get(state).pipe(
+            Effect.map((s) =>
+              Option.fromUndefinedOr(
+                [...s.investigations.values()].filter((i) => i.alertId === alertId && ACTIVE.has(i.status)).at(-1),
+              ),
+            ),
+          ),
         getInvestigation: requireInvestigation,
+        updateInvestigation,
         listProposals: (id) =>
           requireInvestigation(id).pipe(
             Effect.andThen(Ref.get(state)),
@@ -140,7 +205,9 @@ export class IncidentStore extends Context.Service<
               Ref.update(state, (s) => ({ ...s, proposals: new Map([...s.proposals, [proposal.id, proposal]]) })),
             ),
           ),
+        getProposal: requireProposal,
         decide,
+        setProposalStatus,
       })
     }),
   )

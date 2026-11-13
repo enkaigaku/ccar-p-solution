@@ -1,7 +1,9 @@
 import { IncidentApi } from "@incident/contracts"
+import { recordFeedback } from "@incident/telemetry"
 import { Effect, Layer } from "effect"
 import { HttpApiBuilder } from "effect/http-api"
 import { IncidentStore } from "./IncidentStore.ts"
+import { InvestigationRunner } from "./InvestigationRunner.ts"
 
 const SystemHandlers = HttpApiBuilder.group(IncidentApi, "system", (handlers) =>
   Effect.succeed(handlers.handleAll({ health: () => Effect.void })),
@@ -24,11 +26,13 @@ const InvestigationsHandlers = HttpApiBuilder.group(
   "investigations",
   Effect.fn(function* (handlers) {
     const store = yield* IncidentStore
+    const runner = yield* InvestigationRunner
     return handlers.handleAll({
-      start: ({ payload }) => store.startInvestigation(payload.alertId),
+      start: ({ payload }) => runner.start(payload.alertId),
       get: ({ params }) => store.getInvestigation(params.id),
       proposals: ({ params }) => store.listProposals(params.id),
-      feedback: ({ params, payload }) => store.addFeedback(params.id, payload),
+      feedback: ({ params, payload }) =>
+        store.addFeedback(params.id, payload).pipe(Effect.tap(() => recordFeedback(payload.rating))),
     })
   }),
 )
@@ -37,14 +41,14 @@ const ProposalsHandlers = HttpApiBuilder.group(
   IncidentApi,
   "proposals",
   Effect.fn(function* (handlers) {
-    const store = yield* IncidentStore
+    const runner = yield* InvestigationRunner
     return handlers.handleAll({
-      decide: ({ params, payload }) => store.decide(params.id, payload.decision),
+      decide: ({ params, payload }) => runner.decide(params.id, payload.decision),
     })
   }),
 )
 
-/** All handler layers, still requiring an `IncidentStore`. */
+/** All handler layers, still requiring an `IncidentStore` and an `InvestigationRunner`. */
 export const HandlersLayer = Layer.mergeAll(SystemHandlers, AlertsHandlers, InvestigationsHandlers, ProposalsHandlers)
 
 export const ApiRoutes = HttpApiBuilder.layer(IncidentApi, { openapiPath: "/openapi.json" }).pipe(

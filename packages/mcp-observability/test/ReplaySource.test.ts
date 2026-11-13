@@ -93,6 +93,24 @@ describe("ReplaySource", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
 
+  it.effect("answers an unrecorded per-service status from the recorded unfiltered call", () =>
+    Effect.gen(function* () {
+      const source = yield* withSnapshot("direct")
+      const payment = yield* source.getServiceStatus({ service: "payment" })
+      assert.strictEqual(payment.ref, "status-recorded")
+      assert.deepStrictEqual(
+        payment.services.map((s) => s.name),
+        ["payment"],
+      )
+      const cart = yield* source.getServiceStatus({ service: "cart" })
+      assert.strictEqual(cart.ref, "status-recorded")
+      assert.deepStrictEqual(cart.services, [])
+      // Nothing recorded for topology at all: still an empty miss.
+      const topology = yield* source.getServiceTopology({ service: "payment" })
+      assert.match(topology.ref, /^topology-[0-9a-f]{12}$/)
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  )
+
   it.effect("returns empty results on a miss, and an error for an unknown trace", () =>
     Effect.gen(function* () {
       const source = yield* withSnapshot("direct")
