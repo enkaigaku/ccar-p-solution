@@ -1,0 +1,21 @@
+{
+  "kind": "fault",
+  "id": "fc-b3b73745",
+  "snapshotId": "fc-b3b73745",
+  "smoke": true,
+  "groundTruth": {
+    "rootCause": "The ad service fails GetAds requests.",
+    "service": "ad",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "adFailure",
+      "variant": "on"
+    }
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["adFailure", "ad"],
+  "synthetic": false
+}

@@ -1,0 +1,21 @@
+{
+  "kind": "fault",
+  "id": "fc-9b0f93f4",
+  "snapshotId": "fc-9b0f93f4",
+  "smoke": true,
+  "groundTruth": {
+    "rootCause": "The cart service fails 50% of EmptyCart requests, so checkout's PlaceOrder calls fail.",
+    "service": "cart",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "cartFailure",
+      "variant": "50%"
+    }
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["cartFailure-50", "cart"],
+  "synthetic": false
+}
