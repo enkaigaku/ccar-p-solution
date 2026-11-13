@@ -32,9 +32,7 @@ export class OpsConfig extends Context.Service<
       const demoDir = yield* Config.String("OTEL_DEMO_DIR").pipe(Config.withDefault(defaultDemoDir))
       const stateDir = yield* Config.String("OPS_STATE_DIR").pipe(Config.withDefault(defaultStateDir))
       return OpsConfig.of({
-        composeProject: yield* Config.String("OTEL_DEMO_COMPOSE_PROJECT").pipe(
-          Config.withDefault("opentelemetry-demo"),
-        ),
+        composeProject: yield* Config.String("OTEL_DEMO_COMPOSE_PROJECT").pipe(Config.withDefault("otel-demo")),
         demoDir,
         composeFiles: yield* Config.String("OTEL_DEMO_COMPOSE_FILES").pipe(
           Config.withDefault("compose.yaml,compose.extras.yaml"),

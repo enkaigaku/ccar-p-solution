@@ -60,7 +60,7 @@ export const testConfig = (overrides: Partial<ObsConfig["Service"]> = {}) =>
       lokiLevelLabel: "detected_level",
       serviceGraphMetric: "traces_service_graph_request_total",
       topologyFile: new URL("../src/topology/otel-demo.json", import.meta.url).pathname,
-      composeProject: "opentelemetry-demo",
+      composeProject: "otel-demo",
       ...overrides,
     }),
   )

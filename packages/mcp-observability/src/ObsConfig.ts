@@ -33,7 +33,7 @@ export class ObsConfig extends Context.Service<
         lokiLevelLabel: yield* str("LOKI_LEVEL_LABEL", "detected_level"),
         serviceGraphMetric: yield* str("SERVICE_GRAPH_METRIC", "traces_service_graph_request_total"),
         topologyFile: yield* str("TOPOLOGY_FILE", bundledTopology),
-        composeProject: yield* str("OTEL_DEMO_COMPOSE_PROJECT", "opentelemetry-demo"),
+        composeProject: yield* str("OTEL_DEMO_COMPOSE_PROJECT", "otel-demo"),
       })
     }),
   )

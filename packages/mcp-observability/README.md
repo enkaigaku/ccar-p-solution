@@ -49,7 +49,7 @@ npx @modelcontextprotocol/inspector node packages/mcp-observability/src/main.ts
 | `LOKI_LEVEL_LABEL`                 | `detected_level`                     |
 | `SERVICE_GRAPH_METRIC`             | `traces_service_graph_request_total` |
 | `TOPOLOGY_FILE`                    | `src/topology/otel-demo.json`        |
-| `OTEL_DEMO_COMPOSE_PROJECT`        | `opentelemetry-demo`                 |
+| `OTEL_DEMO_COMPOSE_PROJECT`        | `otel-demo`                          |
 | `REPLAY_DIR` / `REPLAY_CASE`       | 未设置                               |
 | `MCP_TRANSPORT`                    | `stdio`                              |
 | `MCP_HTTP_HOST` / `PORT` / `TOKEN` | `127.0.0.1` / `3101` / http 模式必填 |
