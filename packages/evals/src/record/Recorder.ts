@@ -5,7 +5,7 @@ import { FaultCase } from "../dataset/EvalCase.ts"
 import { materializeSnapshot } from "../dataset/materialize.ts"
 import { Flagd } from "./Flagd.ts"
 import { type McpCallError, ObservabilityMcp, recordCall } from "./ObservabilityMcp.ts"
-import type { Scenario } from "./scenarios.ts"
+import { errorRate, p95, requestRate, type Scenario } from "./scenarios.ts"
 
 export interface RecordOptions {
   /** Package root: snapshots go to `fixtures/replay/`, cases to `datasets/fault/`. */
@@ -21,13 +21,9 @@ export interface RecordOptions {
 export class TriggerTimeout extends Schema.TaggedError<TriggerTimeout>()("TriggerTimeout", {
   scenario: Schema.String,
   promql: Schema.String,
+  /** What the recorder saw, so a threshold can be tuned from the error alone. */
+  message: Schema.String,
 }) {}
-
-const errorRate = (service: string) =>
-  `sum(rate(traces_span_metrics_calls_total{service_name="${service}",status_code="STATUS_CODE_ERROR"}[1m]))`
-const requestRate = (service: string) => `sum(rate(traces_span_metrics_calls_total{service_name="${service}"}[1m]))`
-const p95 = (service: string) =>
-  `histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{service_name="${service}"}[1m])))`
 
 const iso = (dt: DateTime.Utc) => DateTime.formatIso(dt)
 
@@ -40,26 +36,47 @@ export const opaqueId = (prefix: "fc", scenario: string, at: DateTime.Utc) =>
 
 const TraceIdPattern = /\b[0-9a-f]{32}\b/g
 
-/** Polls the trigger query until it crosses the threshold, standing in for the alert rule. */
-const waitForTrigger = (scenario: Scenario, options: RecordOptions) =>
+/** The trigger query's current value: the largest `last` across its series, or undefined without data. */
+const triggerValue = (scenario: Scenario) =>
   Effect.gen(function* () {
     const mcp = yield* ObservabilityMcp
-    const check = Effect.gen(function* () {
-      const now = yield* DateTime.now
-      const result = yield* mcp.call("query_metrics", {
-        promql: scenario.trigger.promql,
-        start: iso(DateTime.subtractDuration(now, Duration.minutes(2))),
-        end: iso(now),
-        stepSeconds: 15,
-      })
-      return result.series.some((s) => s.last > scenario.trigger.threshold)
+    const now = yield* DateTime.now
+    const result = yield* mcp.call("query_metrics", {
+      promql: scenario.trigger.promql,
+      start: iso(DateTime.subtractDuration(now, Duration.minutes(3))),
+      end: iso(now),
+      stepSeconds: 15,
     })
+    const values = result.series.map((s) => s.last).filter((v) => Number.isFinite(v))
+    return values.length === 0 ? undefined : Math.max(...values)
+  })
+
+const show = (value: number | undefined) => (value === undefined ? "no data" : String(value))
+
+/**
+ * Polls the trigger query until it is more than the threshold above `baseline` (its value before the fault was
+ * injected; no data counts as 0), standing in for the alert rule.
+ */
+const waitForTrigger = (scenario: Scenario, baseline: number | undefined, options: RecordOptions) =>
+  Effect.gen(function* () {
+    const limit = (baseline ?? 0) + scenario.trigger.threshold
+    let highest: number | undefined
+    const check = triggerValue(scenario).pipe(
+      Effect.map((value) => {
+        if (value !== undefined && (highest === undefined || value > highest)) highest = value
+        return value !== undefined && value > limit
+      }),
+    )
     const fired = yield* check.pipe(
       Effect.repeat({ until: (fired: boolean) => fired, schedule: Schedule.spaced(options.pollEvery) }),
       Effect.timeoutOption(options.triggerTimeout),
     )
     if (fired._tag === "None") {
-      return yield* new TriggerTimeout({ scenario: scenario.name, promql: scenario.trigger.promql })
+      return yield* new TriggerTimeout({
+        scenario: scenario.name,
+        promql: scenario.trigger.promql,
+        message: `${scenario.name}: trigger stayed at or below ${limit} (baseline ${show(baseline)}, highest seen ${show(highest)}) for ${scenario.trigger.promql}`,
+      })
     }
     return yield* DateTime.now
   })
@@ -118,9 +135,12 @@ export const recordScenario = Effect.fn("evals.recordScenario")(function* (scena
   const path = yield* Path.Path
 
   const recorded = yield* Effect.gen(function* () {
+    const baseline = yield* triggerValue(scenario)
     yield* flagd.set(scenario.flag, scenario.variant)
-    yield* Effect.logInfo(`${scenario.name}: ${scenario.flag}=${scenario.variant}, waiting for trigger`)
-    const firedAt = yield* waitForTrigger(scenario, options)
+    yield* Effect.logInfo(
+      `${scenario.name}: ${scenario.flag}=${scenario.variant}, waiting for trigger (baseline ${show(baseline)})`,
+    )
+    const firedAt = yield* waitForTrigger(scenario, baseline, options)
     yield* Effect.sleep(options.afterTrigger)
     const end = yield* DateTime.now
     const start = DateTime.subtractDuration(firedAt, options.lookback)

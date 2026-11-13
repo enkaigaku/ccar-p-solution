@@ -180,7 +180,48 @@ describe("recorder", () => {
         }).pipe(Effect.provide(Layer.mergeAll(Flagd.layerFile(flagFile), never))),
       )
       assert.strictEqual(error._tag, "TriggerTimeout")
+      assert.include(error.message, "baseline no data, highest seen no data")
       assert.strictEqual(JSON.parse(yield* fs.readFileString(flagFile)).flags.paymentFailure.defaultVariant, "off")
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
+
+  it.live("measures the trigger against the baseline from before the fault, not against zero", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const root = yield* fs.makeTempDirectoryScoped()
+      const flagFile = `${root}/demo.flagd.json`
+      yield* fs.writeFileString(flagFile, JSON.stringify(flagdJson))
+      // A service that already has errors: the same level after the fault is not a trigger.
+      const steady = Layer.succeed(
+        ObservabilityMcp,
+        ObservabilityMcp.of({
+          call: () =>
+            Effect.succeed({
+              ref: "m",
+              series: [{ labels: {}, min: 0.5, max: 0.5, avg: 0.5, last: 0.5, tail: [] }],
+            }) as never,
+        }),
+      )
+      const scenario = findScenario("paymentFailure-50")
+      assert(scenario !== undefined)
+      const error = yield* Effect.flip(
+        recordScenario(scenario, {
+          root,
+          triggerTimeout: Duration.millis(30),
+          pollEvery: Duration.millis(5),
+          afterTrigger: Duration.zero,
+          lookback: Duration.minutes(15),
+        }).pipe(Effect.provide(Layer.mergeAll(Flagd.layerFile(flagFile), steady))),
+      )
+      assert.strictEqual(error._tag, "TriggerTimeout")
+      assert.include(error.message, "baseline 0.5, highest seen 0.5")
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  )
+
+  it("queries the metric names Prometheus stores, over a window that holds several samples", () => {
+    for (const s of Scenarios) {
+      assert.notMatch(s.trigger.promql, /calls_total|duration_milliseconds/, s.name)
+      assert.notMatch(s.trigger.promql, /\[1m\]/, s.name)
+    }
+  })
 })

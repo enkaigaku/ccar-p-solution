@@ -66,7 +66,8 @@ const record = Command.make(
     )
     const layer = Layer.mergeAll(Flagd.layerFile(flagdFile), ObservabilityMcp.layerStdio(command, args, env))
 
-    yield* Effect.forEach(
+    // One scenario that never triggers must not cost the recordings after it: report it and go on.
+    const failed = yield* Effect.forEach(
       chosen.filter((s) => typeof s !== "string"),
       (scenario, i) =>
         Effect.gen(function* () {
@@ -79,9 +80,20 @@ const record = Command.make(
             lookback: Duration.minutes(15),
           })
           yield* Console.log(`${scenario.name} → ${result.id} (${result.calls} calls)`)
-        }),
-      { discard: true },
-    ).pipe(Effect.provide(layer))
+          return []
+        }).pipe(
+          Effect.catchTag("TriggerTimeout", (error) => Console.error(error.message).pipe(Effect.as([scenario.name]))),
+        ),
+    ).pipe(
+      Effect.map((names) => names.flat()),
+      Effect.provide(layer),
+    )
+    if (failed.length > 0) {
+      yield* Console.error(`not recorded: ${failed.join(", ")}`)
+      yield* Effect.sync(() => {
+        process.exitCode = 1
+      })
+    }
   }),
 ).pipe(Command.withDescription("Inject faults into the local OTel Demo and record replay snapshots"))
 

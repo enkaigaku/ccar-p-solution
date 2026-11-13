@@ -47,6 +47,7 @@ src/record/              flagd 注入、MCP 客户端、录制器、故障场景
 
    ```bash
    docker compose -f infra/compose.yaml up -d
+   docker compose -f infra/observability/compose.yaml up -d
    infra/scripts/otel-demo.sh up
    ```
 
@@ -60,13 +61,13 @@ src/record/              flagd 注入、MCP 客户端、录制器、故障场景
 
    录制器修改 `infra/.otel-demo/src/flagd/demo.flagd.json` 注入故障，无论成功与否最后都会把所有 flag 复位为 `off`。可用 `--flagd-file`、`--mcp "<命令>"`、`--cooldown-minutes` 覆盖默认值。
 4. 复核新生成的 `datasets/fault/<id>.json`：根因描述是否准确，挑 1–2 条改成 `"smoke": true`，然后提交用例和 `fixtures/replay/<id>/`。
-5. 如果某个场景报 `TriggerTimeout`，说明触发用的 PromQL 在本机指标里不存在或阈值不合适：在 Grafana 里确认指标名后修改 `src/record/scenarios.ts`。触发查询基于 OTel Demo 的 spanmetrics 指标名，首次录制时需要逐个确认。
+5. 触发条件是相对的：录制器在注入故障前先量一次触发查询的基线，注入后数值比基线高出场景的 `threshold` 才算触发，所以阈值不依赖本机的流量大小。某个场景超时不会中断后面的场景，报错里带有基线和观察到的最高值（`baseline …, highest seen …`），据此调整 `src/record/scenarios.ts` 里的阈值；显示 `no data` 说明查询的指标在本机不存在。
+6. 指标名以本仓库 Prometheus 的写法为准（OTLP 接收端不加单位和 `_total` 后缀）：`traces_span_metrics_calls`、`traces_span_metrics_duration_bucket`。demo 的 span 指标约每分钟到一次，rate 窗口用 3 分钟。错误率类场景已按真实流量校准；延迟类和 Kafka 类场景的阈值还没有在真实环境里确认过。
 
 目前目录里有 22 个场景（单 flag 的不同强度），达到 ≥ 40 条还需要组合场景和重复录制，在拿到首批真实快照后补。
 
 ## 尚未打通的部分
 
-- api 还没有返回本次检索到的 chunk id 和实际花费：`chunk` 类引用目前一律判为无效，花费按估算记账。等 M2 集成时在 api 侧补。
 - 检索集要等 `packages/rag` 的语料入库后才能标注；`evaluateRetrieval` 与门禁逻辑已就绪。
 - 两套配置的 A/B 对比（prompt 版本、模型、effort）按 ADR 006 放在 M3。
-- CI 里的真实冒烟评估要等 api 的 agent 实现后再加；现在 `pnpm test` 覆盖 stub 全链路。
+- CI 里还没有真实冒烟评估（需要密钥和 Postgres）；现在 `pnpm test` 覆盖 stub 全链路，真实评估在本机跑。
