@@ -51,7 +51,7 @@ const record = Command.make(
     ),
     cooldownMinutes: Flag.Int("cooldown-minutes").pipe(
       Flag.withDescription("Wait between scenarios so the previous fault drains out of the window"),
-      Flag.withDefault(5),
+      Flag.withDefault(10),
     ),
   },
   Effect.fn(function* ({ names, all, flagdFile, mcp, cooldownMinutes }) {

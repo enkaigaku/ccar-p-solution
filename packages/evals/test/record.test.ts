@@ -146,6 +146,17 @@ describe("recorder", () => {
       assert.strictEqual(snapshot.alert.labels.service, "checkout")
       assert.isTrue(snapshot.calls.some((c) => c.tool === "get_trace"))
       assert.isTrue(snapshot.calls.some((c) => c.tool === "query_logs" && c.input.service === "payment"))
+      // Error, warn and unfiltered logs per service.
+      assert.deepStrictEqual(
+        snapshot.calls.flatMap((c) =>
+          c.tool === "query_logs" && c.input.service === "payment" ? [c.input.level] : [],
+        ),
+        ["error", "warn", undefined],
+      )
+      // The window keeps only a few healthy minutes before the injection, not the previous scenario's fault.
+      const windowMinutes =
+        (DateTime.toEpochMillis(snapshot.window.end) - DateTime.toEpochMillis(snapshot.window.start)) / 60_000
+      assert.isAtMost(windowMinutes, 4.1)
 
       const faultCase = Schema.decodeUnknownSync(Schema.fromJsonString(FaultCase))(
         yield* fs.readFileString(path.join(root, "datasets", "fault", `${result.id}.json`)),

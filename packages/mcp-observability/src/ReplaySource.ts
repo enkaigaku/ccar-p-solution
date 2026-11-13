@@ -39,6 +39,26 @@ export const ReplaySourceLayer = (location: { readonly dir: string; readonly cas
         if (loose !== undefined && !fallback.has(loose)) fallback.set(loose, recorded)
       }
 
+      type RecordedLogs = Extract<RecordedToolCall, { readonly tool: "query_logs" }>
+      const logsByService = new Map<string, Array<RecordedLogs>>()
+      for (const recorded of snapshot.calls) {
+        if (recorded.tool !== "query_logs") continue
+        logsByService.set(recorded.input.service, [...(logsByService.get(recorded.input.service) ?? []), recorded])
+      }
+      /**
+       * Logs without an exact match. `level` is an exact filter in the live source, so a query for one level is only
+       * answered from a recording of that level; a query for all levels is answered from the unfiltered recording,
+       * or from the recording with the most matches when the snapshot has none.
+       */
+      const logsFallback = (input: RecordedLogs["input"]): RecordedLogs | undefined => {
+        const recordings = logsByService.get(input.service) ?? []
+        if (input.level !== undefined) return recordings.find((r) => r.input.level === input.level)
+        return (
+          recordings.find((r) => r.input.level === undefined) ??
+          recordings.toSorted((a, b) => b.output.totalMatched - a.output.totalMatched)[0]
+        )
+      }
+
       const lookup = (call: ToolCallRequest): RecordedToolCall | undefined => {
         const loose = replayFallbackKey(call)
         return exact.get(replayKey(call)) ?? (loose === undefined ? undefined : fallback.get(loose))
@@ -52,9 +72,10 @@ export const ReplaySourceLayer = (location: { readonly dir: string; readonly cas
           )
         },
         queryLogs: (input) => {
-          const hit = lookup({ tool: "query_logs", input })
+          const exactHit = exact.get(replayKey({ tool: "query_logs", input }))
+          const hit = exactHit?.tool === "query_logs" ? exactHit : logsFallback(input)
           return Effect.succeed(
-            hit?.tool === "query_logs"
+            hit !== undefined
               ? hit.output
               : {
                   ref: makeRef("query_logs", input),

@@ -17,12 +17,15 @@ export const Methodologies: Readonly<Record<AlertCategory, Prompt>> = {
 5. Check whether a feature flag, deployment or restart lines up with the start of the symptom.`,
   },
   "error-rate": {
-    version: "method-error-rate@1",
+    version: "method-error-rate@2",
     text: `Methodology: error-rate spike.
-1. Confirm the symptom with an error-rate metric for the alerting service and find when it started.
-2. Read the alerting service's error logs: the most frequent message usually names the failing call.
-3. Follow that call to the dependency it names and read that service's error logs too. The service that
-   originates the error is the root cause; services that only propagate it are symptoms.
+1. Confirm the symptom with an error-rate metric for the alerting service and find when it started. Compare
+   the error rate of its direct dependencies over the same window: the deepest service whose errors rise
+   first is the likely origin.
+2. Read the alerting service's logs at level error and at level warn: the most frequent message usually
+   names the failing call.
+3. Follow that call to the dependency it names and read that service's error and warn logs too. The service
+   that originates the error is the root cause; services that only propagate it are symptoms.
 4. Check container status of the suspected service (restarts, image tag) and whether a feature flag or
    deployment lines up with the start of the errors.
 5. Distinguish a partial failure (a fraction of requests) from a total outage; say which one the data shows.`,
