@@ -52,7 +52,7 @@ src/record/              flagd 注入、MCP 客户端、录制器、故障场景
    ```
 
 2. 按 `packages/mcp-observability/README.md` 配好实时后端地址（不要设置 `REPLAY_DIR`）。
-3. 查看场景并录制。G1 验收先录 3 条，每条约 10–20 分钟（等触发 ≤ 10 分钟、故障保持 2 分钟、场景间冷却 5 分钟）：
+3. 查看场景并录制。G1 验收先录 3 条，每条约 10–20 分钟（等触发 ≤ 10 分钟、故障保持 2 分钟、场景间冷却 10 分钟）。快照窗口从注入前 4 分钟开始，冷却时间必须长于「4 分钟 + 3 分钟 rate 窗口 + 约 1 分钟指标延迟」，否则快照里会混入上一个场景的故障：
 
    ```bash
    pnpm --filter @incident/evals evals scenarios
@@ -62,7 +62,8 @@ src/record/              flagd 注入、MCP 客户端、录制器、故障场景
    录制器修改 `infra/.otel-demo/src/flagd/demo.flagd.json` 注入故障，无论成功与否最后都会把所有 flag 复位为 `off`。可用 `--flagd-file`、`--mcp "<命令>"`、`--cooldown-minutes` 覆盖默认值。
 4. 复核新生成的 `datasets/fault/<id>.json`：根因描述是否准确，挑 1–2 条改成 `"smoke": true`，然后提交用例和 `fixtures/replay/<id>/`。
 5. 触发条件是相对的：录制器在注入故障前先量一次触发查询的基线，注入后数值比基线高出场景的 `threshold` 才算触发，所以阈值不依赖本机的流量大小。某个场景超时不会中断后面的场景，报错里带有基线和观察到的最高值（`baseline …, highest seen …`），据此调整 `src/record/scenarios.ts` 里的阈值；显示 `no data` 说明查询的指标在本机不存在。
-6. 指标名以本仓库 Prometheus 的写法为准（OTLP 接收端不加单位和 `_total` 后缀）：`traces_span_metrics_calls`、`traces_span_metrics_duration_bucket`。demo 的 span 指标约每分钟到一次，rate 窗口用 3 分钟。错误率类场景已按真实流量校准；延迟类和 Kafka 类场景的阈值还没有在真实环境里确认过。
+6. 每个服务录三次日志：`error`、`warn` 和不带级别。`level` 在实时查询里是精确匹配，很多服务把失败请求记在 `warn`，回放时按级别查询只会命中同级别的录制。
+7. 指标名以本仓库 Prometheus 的写法为准（OTLP 接收端不加单位和 `_total` 后缀）：`traces_span_metrics_calls`、`traces_span_metrics_duration_bucket`。demo 的 span 指标约每分钟到一次，rate 窗口用 3 分钟。错误率类场景已按真实流量校准；延迟类和 Kafka 类场景的阈值还没有在真实环境里确认过。
 
 目前目录里有 22 个场景（单 flag 的不同强度），达到 ≥ 40 条还需要组合场景和重复录制，在拿到首批真实快照后补。
 

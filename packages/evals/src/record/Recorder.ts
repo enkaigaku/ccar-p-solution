@@ -25,6 +25,9 @@ export class TriggerTimeout extends Schema.TaggedError<TriggerTimeout>()("Trigge
   message: Schema.String,
 }) {}
 
+/** Healthy telemetry kept before the injection, so the agent can compare before and after. */
+export const PRE_FAULT = Duration.minutes(4)
+
 const iso = (dt: DateTime.Utc) => DateTime.formatIso(dt)
 
 /** Opaque, stable id: same scenario at the same trigger time gives the same id, and the name reveals nothing. */
@@ -101,9 +104,12 @@ const battery = (scenario: Scenario, start: string, end: string) =>
       for (const promql of [errorRate(service), requestRate(service), p95(service)]) {
         calls.push(yield* recordCall("query_metrics", { promql, start, end, stepSeconds: 30 }))
       }
+      // `level` is an exact filter, and services log failures at either level; the unfiltered call answers a query
+      // that names no level.
       for (const level of ["error", "warn"] as const) {
         calls.push(yield* recordCall("query_logs", { service, start, end, level, limit: 20 }))
       }
+      calls.push(yield* recordCall("query_logs", { service, start, end, limit: 20 }))
     }
 
     const traceIds = new Set<string>()
@@ -136,6 +142,7 @@ export const recordScenario = Effect.fn("evals.recordScenario")(function* (scena
 
   const recorded = yield* Effect.gen(function* () {
     const baseline = yield* triggerValue(scenario)
+    const injectedAt = yield* DateTime.now
     yield* flagd.set(scenario.flag, scenario.variant)
     yield* Effect.logInfo(
       `${scenario.name}: ${scenario.flag}=${scenario.variant}, waiting for trigger (baseline ${show(baseline)})`,
@@ -143,7 +150,12 @@ export const recordScenario = Effect.fn("evals.recordScenario")(function* (scena
     const firedAt = yield* waitForTrigger(scenario, baseline, options)
     yield* Effect.sleep(options.afterTrigger)
     const end = yield* DateTime.now
-    const start = DateTime.subtractDuration(firedAt, options.lookback)
+    // The window must not reach back into the previous scenario's fault: it starts at most PRE_FAULT before this
+    // injection, and the cooldown before a scenario has to cover PRE_FAULT plus the rate windows (see BatchOptions).
+    const start = DateTime.max(
+      DateTime.subtractDuration(firedAt, options.lookback),
+      DateTime.subtractDuration(injectedAt, PRE_FAULT),
+    )
     const calls = yield* battery(scenario, iso(start), iso(end))
     return { firedAt, start, end, calls }
   }).pipe(Effect.ensuring(Effect.ignore(flagd.reset)))
@@ -189,7 +201,10 @@ export const recordScenario = Effect.fn("evals.recordScenario")(function* (scena
 })
 
 export interface BatchOptions extends RecordOptions {
-  /** Wait between scenarios, and after clearing a leftover fault, so fault data drains out of the rate windows. */
+  /**
+   * Wait between scenarios, and after clearing a leftover fault. It has to be longer than PRE_FAULT plus the 3 minute
+   * rate window plus about a minute of metric delay, or a snapshot contains the previous scenario's fault.
+   */
   readonly cooldown: Duration.Duration
 }
 

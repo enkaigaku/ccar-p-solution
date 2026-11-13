@@ -93,6 +93,33 @@ describe("ReplaySource", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
 
+  it.effect("answers a level query only from a recording of that level, and an all-levels query from the richest", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const dir = yield* fs.makeTempDirectoryScoped()
+      const logs = (level: "error" | "warn", ref: string, totalMatched: number) => ({
+        tool: "query_logs" as const,
+        input: { service: "payment", ...recordedWindow, level },
+        output: { ref, totalMatched, countsByLevel: {}, topMessages: [], samples: [] },
+      })
+      // The failure is logged at warn; the error recording is empty and comes first.
+      const calls = [logs("error", "logs-error", 0), logs("warn", "logs-warn", 8)]
+      yield* fs.writeFileString(`${dir}/snapshot.json`, JSON.stringify({ ...snapshot, calls }))
+      const source = yield* TelemetrySource.pipe(Effect.provide(ReplaySourceLayer({ dir, caseId: undefined })))
+
+      const anyLevel = yield* source.queryLogs({ service: "payment", ...agentWindow })
+      assert.strictEqual(anyLevel.ref, "logs-warn")
+      const warn = yield* source.queryLogs({ service: "payment", ...agentWindow, level: "warn", contains: "token" })
+      assert.strictEqual(warn.ref, "logs-warn")
+      const error = yield* source.queryLogs({ service: "payment", ...agentWindow, level: "error", contains: "x" })
+      assert.strictEqual(error.ref, "logs-error")
+      // info was not recorded: an empty miss, not another level's lines.
+      const info = yield* source.queryLogs({ service: "payment", ...agentWindow, level: "info" })
+      assert.strictEqual(info.totalMatched, 0)
+      assert.match(info.ref, /^logs-[0-9a-f]{12}$/)
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  )
+
   it.effect("answers an unrecorded per-service status from the recorded unfiltered call", () =>
     Effect.gen(function* () {
       const source = yield* withSnapshot("direct")

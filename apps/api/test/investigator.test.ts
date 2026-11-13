@@ -75,7 +75,7 @@ describe("Investigator", () => {
       assert.strictEqual(report.proposals[0]?.action._tag, "ToggleFlag")
       assert.strictEqual(report.toolCalls, 3)
       assert.strictEqual(report.turns, 4)
-      assert.strictEqual(report.promptVersion, "investigate@1+method-error-rate@1")
+      assert.strictEqual(report.promptVersion, "investigate@1+method-error-rate@2")
       assert.strictEqual(report.indexVersion, "stub")
       assert.deepStrictEqual([...report.retrievedChunkIds], ["stub-postmortem-1", "stub-runbook-1"])
       assert.isAbove(report.usage.costUsd, 0)
