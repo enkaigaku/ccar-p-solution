@@ -43,7 +43,8 @@ export class Flagd extends Context.Service<
   Flagd,
   {
     set(flag: string, variant: string): Effect.Effect<void, FlagdError>
-    readonly reset: Effect.Effect<void, FlagdError>
+    /** Turns every fault off. True when at least one flag was on, i.e. a fault was still being injected. */
+    readonly reset: Effect.Effect<boolean, FlagdError>
   }
 >()("@incident/evals/record/Flagd") {
   static readonly layerFile = (path: string) =>
@@ -60,14 +61,18 @@ export class Flagd extends Context.Service<
             const file = yield* Schema.decodeUnknownEffect(codec)(text).pipe(Effect.mapError(wrap("bad flagd file")))
             const next = f(file)
             if (next instanceof FlagdError) return yield* next
+            const changed = Object.entries(next.flags).some(
+              ([name, flag]) => file.flags[name]?.defaultVariant !== flag.defaultVariant,
+            )
             const json = JSON.stringify(Schema.encodeSync(FlagdFile)(next), null, 2)
             // Write then rename so flagd never reads a half-written file.
             yield* fs.writeFileString(`${path}.tmp`, `${json}\n`).pipe(Effect.mapError(wrap("cannot write flagd file")))
             yield* fs.rename(`${path}.tmp`, path).pipe(Effect.mapError(wrap("cannot replace flagd file")))
+            return changed
           })
 
         return Flagd.of({
-          set: (flag, variant) => update((file) => setVariant(allOff(file), flag, variant)),
+          set: (flag, variant) => update((file) => setVariant(allOff(file), flag, variant)).pipe(Effect.asVoid),
           reset: update(allOff),
         })
       }),

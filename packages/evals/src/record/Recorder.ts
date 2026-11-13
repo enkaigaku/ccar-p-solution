@@ -187,3 +187,38 @@ export const recordScenario = Effect.fn("evals.recordScenario")(function* (scena
   yield* Effect.logInfo(`${scenario.name}: recorded ${recorded.calls.length} calls as ${id}`)
   return { id, calls: recorded.calls.length }
 })
+
+export interface BatchOptions extends RecordOptions {
+  /** Wait between scenarios, and after clearing a leftover fault, so fault data drains out of the rate windows. */
+  readonly cooldown: Duration.Duration
+}
+
+/**
+ * Records scenarios one after another. A scenario whose trigger never fires is reported and skipped, so it does not
+ * cost the recordings after it; any other error stops the batch. Baselines are only measured on a clean system: a
+ * fault left on by a manual injection or a killed run is cleared first and given the cooldown to drain.
+ */
+export const recordBatch = Effect.fn("evals.recordBatch")(function* (
+  scenarios: ReadonlyArray<Scenario>,
+  options: BatchOptions,
+) {
+  const flagd = yield* Flagd
+  const recorded: Array<{ readonly scenario: string; readonly id: string; readonly calls: number }> = []
+  const failed: Array<string> = []
+  for (const [i, scenario] of scenarios.entries()) {
+    if (i === 0) {
+      if (yield* flagd.reset) {
+        yield* Effect.logWarning("A fault was still on; cleared it and waiting for its telemetry to drain")
+        yield* Effect.sleep(options.cooldown)
+      }
+    } else {
+      yield* Effect.sleep(options.cooldown)
+    }
+    const result = yield* recordScenario(scenario, options).pipe(
+      Effect.catchTag("TriggerTimeout", (error) => Effect.logError(error.message).pipe(Effect.as(undefined))),
+    )
+    if (result === undefined) failed.push(scenario.name)
+    else recorded.push({ scenario: scenario.name, ...result })
+  }
+  return { recorded, failed }
+})
