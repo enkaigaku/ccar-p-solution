@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import {
   AlertmanagerWebhook,
+  Investigation,
   InvestigationEvent,
   ObservabilityTools,
   OpsTools,
@@ -45,6 +46,35 @@ describe("HTTP and event contracts", () => {
       ],
     })
     assert.strictEqual(payload.alerts.length, 1)
+  })
+
+  it("decodes an investigation with and without retrieved chunks and usage", () => {
+    const base = {
+      id: "inv-1",
+      alertId: "alert-1",
+      status: "completed",
+      hypotheses: [],
+      promptVersion: "investigate@1",
+      indexVersion: "idx-1",
+      model: "m",
+      createdAt: "2026-11-12T03:00:00Z",
+      updatedAt: "2026-11-12T03:05:00Z",
+    }
+    const json = Schema.toCodecJson(Investigation)
+    const old = Schema.decodeUnknownSync(json)(base)
+    assert.isUndefined(old.retrievedChunkIds)
+    const full = Schema.decodeUnknownSync(json)({
+      ...base,
+      retrievedChunkIds: ["runbook-1#0"],
+      usage: { costUsd: 0.42, inputTokens: 1200, outputTokens: 300 },
+    })
+    assert.deepStrictEqual(full.retrievedChunkIds, ["runbook-1#0"])
+    assert.strictEqual(full.usage?.outputTokens, 300)
+    const negative = Schema.decodeUnknownResult(json)({
+      ...base,
+      usage: { costUsd: -1, inputTokens: 0, outputTokens: 0 },
+    })
+    assert.strictEqual(negative._tag, "Failure")
   })
 
   it("round-trips an SSE event through JSON", () => {
