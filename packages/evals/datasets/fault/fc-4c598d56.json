@@ -1,0 +1,21 @@
+{
+  "kind": "fault",
+  "id": "fc-4c598d56",
+  "snapshotId": "fc-4c598d56",
+  "smoke": true,
+  "groundTruth": {
+    "rootCause": "The payment service fails 50% of charge requests, so checkout cannot place orders.",
+    "service": "payment",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "paymentFailure",
+      "variant": "50%"
+    }
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["paymentFailure-50", "payment"],
+  "synthetic": false
+}
