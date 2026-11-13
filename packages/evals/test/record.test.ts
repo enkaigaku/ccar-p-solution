@@ -5,7 +5,7 @@ import { DateTime, Duration, Effect, FileSystem, Layer, Path, Ref, Schema } from
 import { FaultCase } from "../src/dataset/EvalCase.ts"
 import { allOff, Flagd, FlagdError, FlagdFile, setVariant } from "../src/record/Flagd.ts"
 import { ObservabilityMcp } from "../src/record/ObservabilityMcp.ts"
-import { opaqueId, recordScenario } from "../src/record/Recorder.ts"
+import { opaqueId, recordBatch, recordScenario } from "../src/record/Recorder.ts"
 import { findScenario, Scenarios } from "../src/record/scenarios.ts"
 
 const flagdJson = {
@@ -55,8 +55,10 @@ describe("flagd file", () => {
         assert.strictEqual(after.flags.paymentFailure.defaultVariant, "100%")
         assert.strictEqual(after.flags.adHighCpu.defaultVariant, "off")
         assert.strictEqual(after.flags.paymentFailure.description, flagdJson.flags.paymentFailure.description)
-        yield* flagd.reset
+        assert.isTrue(yield* flagd.reset)
         assert.strictEqual(JSON.parse(yield* fs.readFileString(path)).flags.paymentFailure.defaultVariant, "off")
+        // Nothing left to clear.
+        assert.isFalse(yield* flagd.reset)
       }).pipe(Effect.provide(Flagd.layerFile(path)))
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
@@ -180,7 +182,140 @@ describe("recorder", () => {
         }).pipe(Effect.provide(Layer.mergeAll(Flagd.layerFile(flagFile), never))),
       )
       assert.strictEqual(error._tag, "TriggerTimeout")
+      assert.include(error.message, "baseline no data, highest seen no data")
       assert.strictEqual(JSON.parse(yield* fs.readFileString(flagFile)).flags.paymentFailure.defaultVariant, "off")
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  )
+
+  it.live("measures the trigger against the baseline from before the fault, not against zero", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const root = yield* fs.makeTempDirectoryScoped()
+      const flagFile = `${root}/demo.flagd.json`
+      yield* fs.writeFileString(flagFile, JSON.stringify(flagdJson))
+      // A service that already has errors: the same level after the fault is not a trigger.
+      const steady = Layer.succeed(
+        ObservabilityMcp,
+        ObservabilityMcp.of({
+          call: () =>
+            Effect.succeed({
+              ref: "m",
+              series: [{ labels: {}, min: 0.5, max: 0.5, avg: 0.5, last: 0.5, tail: [] }],
+            }) as never,
+        }),
+      )
+      const scenario = findScenario("paymentFailure-50")
+      assert(scenario !== undefined)
+      const error = yield* Effect.flip(
+        recordScenario(scenario, {
+          root,
+          triggerTimeout: Duration.millis(30),
+          pollEvery: Duration.millis(5),
+          afterTrigger: Duration.zero,
+          lookback: Duration.minutes(15),
+        }).pipe(Effect.provide(Layer.mergeAll(Flagd.layerFile(flagFile), steady))),
+      )
+      assert.strictEqual(error._tag, "TriggerTimeout")
+      assert.include(error.message, "baseline 0.5, highest seen 0.5")
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  )
+
+  it("queries the metric names Prometheus stores, over a window that holds several samples", () => {
+    for (const s of Scenarios) {
+      assert.notMatch(s.trigger.promql, /calls_total|duration_milliseconds/, s.name)
+      assert.notMatch(s.trigger.promql, /\[1m\]/, s.name)
+    }
+  })
+
+  /** Fake live server driven by the flag file: checkout errors appear only while paymentFailure is at 50%. */
+  const flagDrivenMcp = (flagFile: string, seen: Ref.Ref<Array<string>>) =>
+    Layer.effect(
+      ObservabilityMcp,
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        return ObservabilityMcp.of({
+          call: (tool) =>
+            Effect.gen(function* () {
+              const flags = JSON.parse(yield* Effect.orDie(fs.readFileString(flagFile))).flags
+              const on = Object.entries(flags as Record<string, { defaultVariant: string }>)
+                .filter(([, f]) => f.defaultVariant !== "off")
+                .map(([name, f]) => `${name}=${f.defaultVariant}`)
+              yield* Ref.update(seen, (all) => [...all, `${tool}:${on.join(",")}`])
+              switch (tool) {
+                case "query_metrics":
+                  return {
+                    ref: "m",
+                    series: [
+                      { labels: {}, min: 0, max: 1, avg: 0, last: on.includes("paymentFailure=50%") ? 1 : 0, tail: [] },
+                    ],
+                  }
+                case "query_logs":
+                  return { ref: "l", totalMatched: 0, countsByLevel: {}, topMessages: [], samples: [] }
+                case "get_service_status":
+                  return { ref: "st", services: [] }
+                default:
+                  return { ref: "topo", edges: [] }
+              }
+            }) as never,
+        })
+      }),
+    )
+
+  const batchOptions = (root: string) => ({
+    root,
+    triggerTimeout: Duration.millis(40),
+    pollEvery: Duration.millis(5),
+    afterTrigger: Duration.zero,
+    lookback: Duration.minutes(15),
+    cooldown: Duration.millis(10),
+  })
+
+  const setup = Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const root = yield* fs.makeTempDirectoryScoped()
+    const flagFile = `${root}/demo.flagd.json`
+    // adHighCpu is still on in this file: a fault left over from an earlier run.
+    yield* fs.writeFileString(flagFile, JSON.stringify(flagdJson))
+    yield* fs.makeDirectory(`${root}/datasets/fault`, { recursive: true })
+    const seen = yield* Ref.make<Array<string>>([])
+    const layer = Layer.mergeAll(Flagd.layerFile(flagFile), flagDrivenMcp(flagFile, seen))
+    return { root, flagFile, seen, layer }
+  })
+
+  const scenarios = (...names: ReadonlyArray<string>) =>
+    names.map((name) => {
+      const scenario = findScenario(name)
+      assert(scenario !== undefined, name)
+      return scenario
+    })
+
+  it.live("goes on after a scenario that never triggers, and clears a leftover fault before the first baseline", () =>
+    Effect.gen(function* () {
+      const { root, flagFile, seen, layer } = yield* setup
+      const fs = yield* FileSystem.FileSystem
+      const result = yield* recordBatch(scenarios("paymentFailure-100", "paymentFailure-50"), batchOptions(root)).pipe(
+        Effect.provide(layer),
+      )
+      assert.deepStrictEqual(result.failed, ["paymentFailure-100"])
+      assert.deepStrictEqual(
+        result.recorded.map((r) => r.scenario),
+        ["paymentFailure-50"],
+      )
+      // The first baseline query runs with every fault off, not with the leftover adHighCpu.
+      assert.strictEqual((yield* Ref.get(seen))[0], "query_metrics:")
+      assert.strictEqual(JSON.parse(yield* fs.readFileString(flagFile)).flags.paymentFailure.defaultVariant, "off")
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  )
+
+  it.live("stops the batch on an error other than a trigger timeout", () =>
+    Effect.gen(function* () {
+      const { root, seen, layer } = yield* setup
+      // cartFailure is not in this flag file, so injecting it fails.
+      const error = yield* Effect.flip(
+        recordBatch(scenarios("cartFailure-50", "paymentFailure-50"), batchOptions(root)).pipe(Effect.provide(layer)),
+      )
+      assert.strictEqual(error._tag, "FlagdError")
+      assert.isFalse((yield* Ref.get(seen)).some((call) => call.includes("paymentFailure=50%")))
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
 })

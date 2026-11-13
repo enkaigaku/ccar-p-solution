@@ -7,7 +7,7 @@ import { calibrate } from "./judge/calibration.ts"
 import { Judge } from "./judge/Judge.ts"
 import { Flagd } from "./record/Flagd.ts"
 import { ObservabilityMcp } from "./record/ObservabilityMcp.ts"
-import { recordScenario } from "./record/Recorder.ts"
+import { recordBatch } from "./record/Recorder.ts"
 import { findScenario, Scenarios } from "./record/scenarios.ts"
 
 const repoRoot = new URL("../../../", import.meta.url).pathname
@@ -66,22 +66,24 @@ const record = Command.make(
     )
     const layer = Layer.mergeAll(Flagd.layerFile(flagdFile), ObservabilityMcp.layerStdio(command, args, env))
 
-    yield* Effect.forEach(
+    const { recorded, failed } = yield* recordBatch(
       chosen.filter((s) => typeof s !== "string"),
-      (scenario, i) =>
-        Effect.gen(function* () {
-          if (i > 0) yield* Effect.sleep(Duration.minutes(cooldownMinutes))
-          const result = yield* recordScenario(scenario, {
-            root: packageRoot,
-            triggerTimeout: Duration.minutes(10),
-            pollEvery: Duration.seconds(15),
-            afterTrigger: Duration.minutes(2),
-            lookback: Duration.minutes(15),
-          })
-          yield* Console.log(`${scenario.name} → ${result.id} (${result.calls} calls)`)
-        }),
-      { discard: true },
+      {
+        root: packageRoot,
+        triggerTimeout: Duration.minutes(10),
+        pollEvery: Duration.seconds(15),
+        afterTrigger: Duration.minutes(2),
+        lookback: Duration.minutes(15),
+        cooldown: Duration.minutes(cooldownMinutes),
+      },
     ).pipe(Effect.provide(layer))
+    for (const r of recorded) yield* Console.log(`${r.scenario} → ${r.id} (${r.calls} calls)`)
+    if (failed.length > 0) {
+      yield* Console.error(`not recorded: ${failed.join(", ")}`)
+      yield* Effect.sync(() => {
+        process.exitCode = 1
+      })
+    }
   }),
 ).pipe(Command.withDescription("Inject faults into the local OTel Demo and record replay snapshots"))
 

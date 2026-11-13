@@ -8,7 +8,10 @@ export interface Scenario {
   readonly name: string
   readonly flag: string
   readonly variant: string
-  /** PromQL whose value crossing `threshold` stands in for the alert rule firing. */
+  /**
+   * PromQL that stands in for the alert rule: it fires once the value is more than `threshold` above the baseline
+   * the recorder measures just before it injects the fault, so thresholds do not depend on a machine's traffic.
+   */
   readonly trigger: { readonly promql: string; readonly threshold: number }
   readonly alert: { readonly alertname: string; readonly service: string; readonly summary: string }
   readonly rootCause: { readonly service: string; readonly text: string; readonly alternatives: ReadonlyArray<string> }
@@ -16,16 +19,34 @@ export interface Scenario {
   readonly focus: ReadonlyArray<string>
 }
 
-const errorRate = (service: string) =>
-  `sum(rate(traces_span_metrics_calls_total{service_name="${service}",status_code="STATUS_CODE_ERROR"}[1m]))`
-const p95 = (service: string) =>
-  `histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{service_name="${service}"}[1m])))`
+// Metric names as Prometheus stores them here: the OTLP receiver is configured without unit or `_total` suffixes
+// (infra/observability/prometheus/prometheus.yaml). The demo's span metrics reach Prometheus about once a minute,
+// so rates use a 3 minute window; a 1 minute window often holds a single sample and returns nothing.
+export const errorRate = (service: string) =>
+  `sum(rate(traces_span_metrics_calls{service_name="${service}",status_code="STATUS_CODE_ERROR"}[3m]))`
+export const requestRate = (service: string) => `sum(rate(traces_span_metrics_calls{service_name="${service}"}[3m]))`
+export const p95 = (service: string) =>
+  `histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name="${service}"}[3m])))`
 
-const percent = (flag: string, variant: string, service: string, upstream: string, text: string): Scenario => ({
+/**
+ * Errors per second above the baseline that count as "the alert fires" for services with little traffic. The demo's
+ * default load places an order every 30 to 60 seconds (checkout sees about 0.2 spans/s in total), so one failed order
+ * within the window, about 0.005/s, has to be enough.
+ */
+const LOW_TRAFFIC_ERRORS = 0.004
+
+const percent = (
+  flag: string,
+  variant: string,
+  service: string,
+  upstream: string,
+  text: string,
+  triggerOn: string = upstream,
+): Scenario => ({
   name: `${flag}-${variant.replace("%", "")}`,
   flag,
   variant,
-  trigger: { promql: errorRate(upstream), threshold: 0.2 },
+  trigger: { promql: errorRate(triggerOn), threshold: LOW_TRAFFIC_ERRORS },
   alert: { alertname: "HighErrorRate", service: upstream, summary: `${upstream} error rate is elevated` },
   rootCause: { service, text, alternatives: [] },
   focus: [service, upstream],
@@ -48,13 +69,15 @@ export const Scenarios: ReadonlyArray<Scenario> = [
       "cart",
       "frontend",
       `The cart service fails ${v} of EmptyCart requests, surfacing as frontend and checkout errors.`,
+      // EmptyCart only runs at checkout, so the few failures drown in the frontend's own error noise.
+      "cart",
     ),
   ),
   {
     name: "paymentUnreachable",
     flag: "paymentUnreachable",
     variant: "on",
-    trigger: { promql: errorRate("checkout"), threshold: 0.2 },
+    trigger: { promql: errorRate("checkout"), threshold: LOW_TRAFFIC_ERRORS },
     alert: { alertname: "HighErrorRate", service: "checkout", summary: "checkout error rate is elevated" },
     rootCause: {
       service: "payment",
@@ -67,7 +90,7 @@ export const Scenarios: ReadonlyArray<Scenario> = [
     name: "adFailure",
     flag: "adFailure",
     variant: "on",
-    trigger: { promql: errorRate("ad"), threshold: 0.1 },
+    trigger: { promql: errorRate("ad"), threshold: 0.02 },
     alert: { alertname: "HighErrorRate", service: "frontend", summary: "frontend dependency errors are elevated" },
     rootCause: { service: "ad", text: "The ad service fails GetAds requests.", alternatives: [] },
     focus: ["ad", "frontend"],
