@@ -50,7 +50,7 @@ pnpm dev:api        # http://localhost:3000/docs
 | `APPROVAL_SIGNING_KEY`                              | —                              | ≥ 32 字符，与 mcp-ops 共用                                                              |
 | `OBSERVABILITY_MCP_URL` / `OBSERVABILITY_MCP_TOKEN` | —                              | 设置后用 Streamable HTTP；否则每次调查 stdio 启动一个 mcp-observability                 |
 | `OPS_MCP_URL` / `OPS_MCP_TOKEN`                     | —                              | 同上，针对 mcp-ops（每次执行启动一个）                                                  |
-| `OBS_REPLAY_DIR`                                    | —                              | 回放模式：mcp-observability 以 `REPLAY_DIR=<它>`、`REPLAY_CASE=<告警 fingerprint>` 启动 |
+| `OBS_REPLAY_DIR`                                    | —                              | 回放模式：mcp-observability 以 `REPLAY_DIR=<它>`、`REPLAY_CASE=<告警 fingerprint>` 启动；告诉 agent 的「当前时间」取快照录制窗口的结束时刻 |
 | `AGENT_MAX_TURNS` / `AGENT_MAX_COST_USD`            | `12` / `0.6`                   | 超过后强制出报告                                                                        |
 | `INVESTIGATION_TIMEOUT`                             | `5 minutes`                    | 超时记为 failed                                                                         |
 | `MAX_CONCURRENT_INVESTIGATIONS`                     | `2`                            |                                                                                         |

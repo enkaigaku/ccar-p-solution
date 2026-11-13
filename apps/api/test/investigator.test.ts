@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import { InvestigationId, Retriever } from "@incident/contracts"
-import { Effect, Layer } from "effect"
+import { DateTime, Effect, Layer, Option } from "effect"
 import { type AgentSettings, Investigator, isEmptyResult } from "../src/agent/Investigator.ts"
 import { AuditLog } from "../src/audit/AuditLog.ts"
 import { ObservabilityGateway } from "../src/mcp/ObservabilityGateway.ts"
@@ -18,7 +18,11 @@ import {
 
 const investigationId = InvestigationId.make("inv-1")
 
-const run = (replies: Array<FakeReply>, settings: AgentSettings = { maxTurns: 10, maxCostUsd: 5 }) =>
+const run = (
+  replies: Array<FakeReply>,
+  settings: AgentSettings = { maxTurns: 10, maxCostUsd: 5 },
+  asOf: Option.Option<DateTime.Utc> = Option.none(),
+) =>
   Effect.gen(function* () {
     const claude = fakeAnthropic(replies)
     const recorded = yield* recordingEvents
@@ -29,7 +33,7 @@ const run = (replies: Array<FakeReply>, settings: AgentSettings = { maxTurns: 10
           claude.layer,
           recorded.layer,
           Retriever.layerStub,
-          ObservabilityGateway.layerFrom(observabilitySession),
+          ObservabilityGateway.layerFrom(observabilitySession, asOf),
           Layer.succeed(AuditLog, audit.service),
         ),
       ),
@@ -205,6 +209,17 @@ describe("Investigator", () => {
       assert.strictEqual(outcome._tag, "Success")
       if (outcome._tag !== "Success") return
       assert.strictEqual(outcome.success.status, "insufficient_information")
+    }),
+  )
+
+  it.effect("tells the model the end of the recording as the current time when telemetry is replayed", () =>
+    Effect.gen(function* () {
+      const done = [reply("end_turn", [jsonText({ status: "insufficient_information", hypotheses: [] })])]
+      const replayed = yield* run(done, undefined, Option.some(DateTime.makeUnsafe("2026-11-12T03:06:00Z")))
+      assert.include(userMessages(replayed.requests[0] ?? {}), "Current time 2026-11-12T03:06:00.000Z.")
+      // Live telemetry: the clock, which TestClock starts at the epoch.
+      const live = yield* run(done)
+      assert.include(userMessages(live.requests[0] ?? {}), "Current time 1970-01-01T00:00:00.000Z.")
     }),
   )
 
