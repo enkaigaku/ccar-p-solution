@@ -29,6 +29,13 @@ export const InvestigationStatus = Schema.Literals([
 ])
 export type InvestigationStatus = typeof InvestigationStatus.Type
 
+/** Model usage of one investigation (triage and agent turns together), for budgets and cost reports. */
+export class InvestigationUsage extends Schema.Class<InvestigationUsage>("@incident/contracts/InvestigationUsage")({
+  costUsd: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  inputTokens: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  outputTokens: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+}) {}
+
 export class Investigation extends Schema.Class<Investigation>("@incident/contracts/Investigation")({
   id: InvestigationId,
   alertId: AlertId,
@@ -38,6 +45,13 @@ export class Investigation extends Schema.Class<Investigation>("@incident/contra
   promptVersion: Schema.String,
   indexVersion: Schema.String,
   model: Schema.String,
+  /**
+   * Ids of the knowledge chunks the run retrieved (initial retrieval and `search_knowledge`). `chunk` evidence is
+   * valid only if its ref is listed here. Absent until the run has retrieved.
+   */
+  retrievedChunkIds: Schema.optionalKey(Schema.Array(Schema.String)),
+  /** Absent until the run has called a model. */
+  usage: Schema.optionalKey(InvestigationUsage),
   traceId: Schema.optionalKey(Schema.String),
   createdAt: Schema.DateTimeUtcFromString,
   updatedAt: Schema.DateTimeUtcFromString,
