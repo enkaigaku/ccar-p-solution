@@ -4,6 +4,11 @@
  * Alertmanager would send, and the labelled root cause. `emitRawPii` and the `ai*` flags are not failure scenarios
  * for this project and are left out. A test checks every flag and variant against the 3.1.0 flag list.
  *
+ * Three more flags are left out because they change nothing a recording could observe in the docker compose
+ * deployment (checked against a live run): `productCatalogFailure` (no error spans anywhere), `kafkaQueueProblems`
+ * (the core compose file runs no Kafka, fraud-detection or accounting) and `failedReadinessProbe` (nothing acts on
+ * readiness probes outside Kubernetes).
+ *
  * Two kinds: single-fault scenarios, and the same faults with a distractor, a second fault injected at the same time
  * on a path that cannot cause the alert. The labelled root cause of a distractor scenario is still the first fault.
  */
@@ -12,6 +17,8 @@ export interface Distractor {
   readonly variant: string
   /** The service the distractor fault lives in. */
   readonly service: string
+  /** The signal the distractor moves, recorded so the red herring is in the snapshot. */
+  readonly promql: string
 }
 
 export interface Scenario {
@@ -39,6 +46,10 @@ export const errorRate = (service: string) =>
 export const requestRate = (service: string) => `sum(rate(traces_span_metrics_calls{service_name="${service}"}[3m]))`
 export const p95 = (service: string) =>
   `histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name="${service}"}[3m])))`
+
+/** p95 of one span. A slow span that is a small share of a service's calls does not move the service's p95. */
+export const spanP95 = (service: string, span: string) =>
+  `histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name="${service}",span_name="${span}"}[3m])))`
 
 /**
  * Errors per second above the baseline that count as "the alert fires" for services with little traffic. The demo's
@@ -106,14 +117,16 @@ const SingleFaults: ReadonlyArray<Scenario> = [
     distractors: [],
   },
   {
+    // The ad service's latency barely moves (GetAds p95 3 ms to 5 ms); the load shows in the JVM's CPU utilization,
+    // which goes from about 0 to 0.45.
     name: "adHighCpu",
     flag: "adHighCpu",
     variant: "on",
-    trigger: { promql: p95("ad"), threshold: 500 },
-    alert: { alertname: "HighLatency", service: "frontend", summary: "frontend p95 latency is elevated" },
+    trigger: { promql: 'max(jvm_cpu_recent_utilization{service_name="ad"})', threshold: 0.2 },
+    alert: { alertname: "HighCpu", service: "ad", summary: "ad CPU utilization is high" },
     rootCause: {
       service: "ad",
-      text: "The ad service is CPU-saturated, slowing pages that wait on ads.",
+      text: "The ad service is CPU-saturated: something inside it burns CPU while request traffic is unchanged.",
       alternatives: ["high CPU load in the ad service"],
     },
     focus: ["ad", "frontend"],
@@ -131,20 +144,6 @@ const SingleFaults: ReadonlyArray<Scenario> = [
       alternatives: ["GC pauses in the ad service"],
     },
     focus: ["ad", "frontend"],
-    distractors: [],
-  },
-  {
-    name: "productCatalogFailure",
-    flag: "productCatalogFailure",
-    variant: "on",
-    trigger: { promql: errorRate("product-catalog"), threshold: 0.05 },
-    alert: { alertname: "HighErrorRate", service: "frontend", summary: "frontend error rate is elevated" },
-    rootCause: {
-      service: "product-catalog",
-      text: "The product catalog service fails requests for one specific product.",
-      alternatives: ["product-catalog returns errors for a single product id"],
-    },
-    focus: ["product-catalog", "frontend"],
     distractors: [],
   },
   {
@@ -177,39 +176,49 @@ const SingleFaults: ReadonlyArray<Scenario> = [
   },
   ...["5sec", "10sec"].map(
     (v): Scenario => ({
+      // The delay is added in frontend-proxy on the image route: image-provider stays fast and gets fewer requests,
+      // and the frontend's own p95 does not move.
       name: `imageSlowLoad-${v}`,
       flag: "imageSlowLoad",
       variant: v,
-      trigger: { promql: p95("frontend"), threshold: 2000 },
-      alert: { alertname: "HighLatency", service: "frontend", summary: "frontend p95 latency is elevated" },
+      trigger: { promql: spanP95("frontend-proxy", "GET"), threshold: 2000 },
+      alert: { alertname: "HighLatency", service: "frontend-proxy", summary: "frontend-proxy p95 latency is elevated" },
       rootCause: {
-        service: "frontend",
-        text: `Product images load ${v} slower (image provider delay).`,
-        alternatives: [],
+        service: "frontend-proxy",
+        text: `Product image requests through frontend-proxy are delayed by ${v}; image-provider itself stays fast.`,
+        alternatives: ["slow loading of product images", "image requests are delayed before they reach image-provider"],
       },
-      focus: ["frontend"],
+      focus: ["frontend-proxy", "frontend-web", "image-provider", "frontend"],
       distractors: [],
     }),
   ),
   ...["5sec", "10sec"].map(
     (v): Scenario => ({
+      // Ship-order calls are about 8% of shipping's calls, so shipping's p95 stays flat; the delay shows in checkout's
+      // PlaceOrder, which waits for it.
       name: `intlShippingSlowdown-${v}`,
       flag: "intlShippingSlowdown",
       variant: v,
-      trigger: { promql: p95("shipping"), threshold: 2000 },
+      trigger: { promql: spanP95("checkout", "oteldemo.CheckoutService/PlaceOrder"), threshold: 2000 },
       alert: { alertname: "HighLatency", service: "checkout", summary: "checkout p95 latency is elevated" },
-      rootCause: { service: "shipping", text: `International shipping quotes are delayed by ${v}.`, alternatives: [] },
+      rootCause: {
+        service: "shipping",
+        text: `The shipping service's ship-order calls are delayed by ${v} (international shipping slowdown), so placing an order is slow.`,
+        alternatives: ["slow ship-order requests in the shipping service"],
+      },
       focus: ["shipping", "quote", "checkout"],
       distractors: [],
     }),
   ),
-  ...["100x", "1000x", "10000x"].map(
+  // 100x is left out: its effect (p95 4 ms to 14 ms on average) is within noise.
+  ...["1000x", "10000x"].map(
     (v): Scenario => ({
       name: `emailMemoryLeak-${v}`,
       flag: "emailMemoryLeak",
       variant: v,
-      trigger: { promql: p95("email"), threshold: 500 },
-      alert: { alertname: "HighLatency", service: "checkout", summary: "checkout p95 latency is elevated" },
+      // Small in absolute terms: about 5 ms to 48 ms at 1000x and to a few hundred ms at 10000x.
+      trigger: { promql: spanP95("email", "POST /send_order_confirmation"), threshold: 25 },
+      alert: { alertname: "HighLatency", service: "email", summary: "email p95 latency is elevated" },
       rootCause: {
         service: "email",
         text: "The email service leaks memory and slows down or restarts.",
@@ -220,47 +229,21 @@ const SingleFaults: ReadonlyArray<Scenario> = [
     }),
   ),
   {
-    // 3.1.0 has one strength ("on") and no kafkaConsumerDead flag. Checkout sends a burst of extra messages for each
-    // order while the consumers sleep before each message.
-    name: "kafkaQueueProblems",
-    flag: "kafkaQueueProblems",
-    variant: "on",
-    trigger: { promql: 'sum(kafka_consumer_lag{topic="orders"})', threshold: 100 },
-    alert: { alertname: "ConsumerLag", service: "fraud-detection", summary: "orders consumer lag is growing" },
-    rootCause: {
-      service: "fraud-detection",
-      text: "Checkout floods the orders Kafka topic with extra messages while the fraud-detection consumer is slowed down, so consumer lag on the orders topic spikes.",
-      alternatives: ["checkout overproduces messages to the orders topic", "slow Kafka consumer in fraud-detection"],
-    },
-    focus: ["fraud-detection", "accounting", "checkout", "kafka"],
-    distractors: [],
-  },
-  {
-    name: "failedReadinessProbe",
-    flag: "failedReadinessProbe",
-    variant: "on",
-    trigger: { promql: errorRate("frontend"), threshold: 0.1 },
-    alert: { alertname: "HighErrorRate", service: "frontend", summary: "frontend error rate is elevated" },
-    rootCause: {
-      service: "cart",
-      text: "The cart service fails its readiness probe and is taken out of rotation.",
-      alternatives: ["cart readiness probe failures"],
-    },
-    focus: ["cart", "frontend"],
-    distractors: [],
-  },
-  {
+    // Latency stays flat; the homepage's request rate goes from about 0.4/s to 20/s and more.
     name: "loadGeneratorFloodHomepage",
     flag: "loadGeneratorFloodHomepage",
     variant: "on",
-    trigger: { promql: p95("frontend"), threshold: 1000 },
-    alert: { alertname: "HighLatency", service: "frontend", summary: "frontend p95 latency is elevated" },
+    trigger: {
+      promql: 'sum(rate(traces_span_metrics_calls{service_name="frontend",span_name="GET /"}[3m]))',
+      threshold: 10,
+    },
+    alert: { alertname: "TrafficSpike", service: "frontend", summary: "frontend request rate is far above normal" },
     rootCause: {
       service: "load-generator",
-      text: "The load generator floods the homepage with requests, overloading the frontend.",
+      text: "The load generator floods the homepage with requests, multiplying the frontend's request rate.",
       alternatives: ["a traffic spike on the homepage"],
     },
-    focus: ["frontend", "load-generator"],
+    focus: ["frontend", "frontend-proxy", "load-generator"],
     distractors: [],
   },
 ]
@@ -271,6 +254,7 @@ const SingleFaults: ReadonlyArray<Scenario> = [
  * is not paired with paymentFailure, because "frontend dependency errors" would then have two true causes.
  */
 export const DistractorPairs: ReadonlyArray<readonly [fault: string, distractor: string]> = [
+  ["paymentFailure-10", "adManualGc"],
   ["paymentFailure-25", "imageSlowLoad-5sec"],
   ["paymentFailure-50", "adHighCpu"],
   ["paymentFailure-75", "adFailure"],
@@ -278,27 +262,38 @@ export const DistractorPairs: ReadonlyArray<readonly [fault: string, distractor:
   ["paymentFailure-100", "productCatalogLockContention"],
   ["paymentUnreachable", "adManualGc"],
   ["paymentUnreachable", "imageSlowLoad-10sec"],
+  ["cartFailure-10", "imageSlowLoad-10sec"],
   ["cartFailure-25", "productCatalogLockContention"],
   ["cartFailure-50", "adFailure"],
   ["cartFailure-75", "adHighCpu"],
+  ["cartFailure-90", "adManualGc"],
   ["cartFailure-100", "recommendationCacheFailure"],
   ["adFailure", "intlShippingSlowdown-5sec"],
   ["adHighCpu", "cartFailure-50"],
-  ["productCatalogFailure", "adHighCpu"],
+  ["adManualGc", "cartFailure-25"],
   ["productCatalogLockContention", "paymentFailure-50"],
   ["recommendationCacheFailure", "cartFailure-50"],
+  ["intlShippingSlowdown-5sec", "adManualGc"],
   ["intlShippingSlowdown-10sec", "adFailure"],
+  ["imageSlowLoad-5sec", "cartFailure-75"],
   ["imageSlowLoad-10sec", "paymentFailure-50"],
   ["emailMemoryLeak-1000x", "adManualGc"],
-  ["kafkaQueueProblems", "adHighCpu"],
-  ["failedReadinessProbe", "intlShippingSlowdown-5sec"],
+  ["emailMemoryLeak-10000x", "adFailure"],
+  ["loadGeneratorFloodHomepage", "paymentFailure-50"],
 ]
 
 const withDistractor = (fault: Scenario, distractor: Scenario): Scenario => ({
   ...fault,
   name: `${fault.name}+${distractor.name}`,
   focus: [...new Set([...fault.focus, ...distractor.focus])],
-  distractors: [{ flag: distractor.flag, variant: distractor.variant, service: distractor.rootCause.service }],
+  distractors: [
+    {
+      flag: distractor.flag,
+      variant: distractor.variant,
+      service: distractor.rootCause.service,
+      promql: distractor.trigger.promql,
+    },
+  ],
 })
 
 export const Scenarios: ReadonlyArray<Scenario> = [

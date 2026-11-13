@@ -420,6 +420,10 @@ describe("recorder", () => {
         yield* fs.readFileString(`${root}/fixtures/replay/${id}/snapshot.json`),
       )
       assert.isTrue(snapshot.calls.some((c) => c.tool === "query_logs" && c.input.service === "ad"))
+      // So is the signal the distractor moves, which the per-service queries may not show.
+      assert.isTrue(
+        snapshot.calls.some((c) => c.tool === "query_metrics" && c.input.promql.includes("jvm_cpu_recent_utilization")),
+      )
       const flags = JSON.parse(yield* fs.readFileString(flagFile)).flags
       assert.strictEqual(flags.adHighCpu.defaultVariant, "off")
       assert.strictEqual(flags.paymentFailure.defaultVariant, "off")

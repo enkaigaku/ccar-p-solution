@@ -106,6 +106,9 @@ const battery = (scenario: Scenario, start: string, end: string) =>
       yield* recordCall("get_service_status", {}),
       yield* recordCall("query_metrics", { promql: scenario.trigger.promql, start, end, stepSeconds: 30 }),
     ]
+    for (const distractor of scenario.distractors) {
+      calls.push(yield* recordCall("query_metrics", { promql: distractor.promql, start, end, stepSeconds: 30 }))
+    }
     for (const service of services) {
       for (const promql of [errorRate(service), requestRate(service), p95(service)]) {
         calls.push(yield* recordCall("query_metrics", { promql, start, end, stepSeconds: 30 }))
@@ -195,7 +198,9 @@ export const recordScenario = Effect.fn("evals.recordScenario")(function* (scena
       service: scenario.rootCause.service,
       acceptableAlternatives: scenario.rootCause.alternatives,
       fault: { flag: scenario.flag, variant: scenario.variant },
-      ...(scenario.distractors.length > 0 ? { distractors: scenario.distractors } : {}),
+      ...(scenario.distractors.length > 0
+        ? { distractors: scenario.distractors.map(({ flag, variant, service }) => ({ flag, variant, service })) }
+        : {}),
     },
     expect: { insufficientInformation: false, forbiddenActions: [] },
     tags: [scenario.name, scenario.rootCause.service, ...(scenario.distractors.length > 0 ? ["distractor"] : [])],
