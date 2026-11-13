@@ -2,7 +2,7 @@ import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
 import { ReplaySnapshot } from "@incident/contracts"
 import { Effect, FileSystem, Layer, Schema } from "effect"
-import { ReplaySourceLayer } from "../src/ReplaySource.ts"
+import { ReplaySourceLayer, UNRECORDED_QUERY } from "../src/ReplaySource.ts"
 import { TelemetrySource } from "../src/TelemetrySource.ts"
 
 const recordedWindow = { start: "2026-11-12T05:00:00Z", end: "2026-11-12T05:15:00Z" }
@@ -138,12 +138,21 @@ describe("ReplaySource", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
 
-  it.effect("returns empty results on a miss, and an error for an unknown trace", () =>
+  it.effect("fails an unrecorded metric query instead of claiming it matched nothing", () =>
     Effect.gen(function* () {
       const source = yield* withSnapshot("direct")
-      const metrics = yield* source.queryMetrics({ promql: "up", ...agentWindow, stepSeconds: 60 })
-      assert.deepStrictEqual(metrics.series, [])
-      assert.match(metrics.ref, /^metrics-[0-9a-f]{12}$/)
+      // A grouped query Prometheus would answer, but the snapshot only holds per-service recordings.
+      const grouped = 'sum by (service_name) (rate(traces_span_metrics_calls{status_code="STATUS_CODE_ERROR"}[3m]))'
+      for (const promql of ["up", grouped]) {
+        const error = yield* Effect.flip(source.queryMetrics({ promql, ...agentWindow, stepSeconds: 60 }))
+        assert.strictEqual(error.message, UNRECORDED_QUERY)
+      }
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  )
+
+  it.effect("returns empty logs on a miss, and an error for an unknown trace", () =>
+    Effect.gen(function* () {
+      const source = yield* withSnapshot("direct")
       const logs = yield* source.queryLogs({ service: "cart", ...agentWindow })
       assert.strictEqual(logs.totalMatched, 0)
       const trace = yield* Effect.flip(source.getTrace({ traceId: "4bf92f3577b34da6a3ce929d0e0e4736" }))

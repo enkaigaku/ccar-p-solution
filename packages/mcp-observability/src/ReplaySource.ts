@@ -14,6 +14,9 @@ import { makeRef, TelemetrySource } from "./TelemetrySource.ts"
  * Snapshot format and matching keys are the `ReplaySnapshot` contract.
  */
 
+export const UNRECORDED_QUERY =
+  "This source cannot evaluate this query: it only answers the per-service forms listed in the tool description (error rate, request rate, p95 latency), one service at a time, for services in the topology. No data was returned; this says nothing about the metric."
+
 export const ReplaySourceLayer = (location: { readonly dir: string; readonly caseId: string | undefined }) =>
   Layer.effect(
     TelemetrySource,
@@ -65,11 +68,13 @@ export const ReplaySourceLayer = (location: { readonly dir: string; readonly cas
       }
 
       return TelemetrySource.of({
+        // A snapshot cannot evaluate PromQL, so a query it has no recording for is an error. An empty result would
+        // claim that the query matched no series, which the agent reads as "this service has no errors".
         queryMetrics: (input) => {
           const hit = lookup({ tool: "query_metrics", input })
-          return Effect.succeed(
-            hit?.tool === "query_metrics" ? hit.output : { ref: makeRef("query_metrics", input), series: [] },
-          )
+          return hit?.tool === "query_metrics"
+            ? Effect.succeed(hit.output)
+            : Effect.fail(new ToolError({ message: UNRECORDED_QUERY }))
         },
         queryLogs: (input) => {
           const exactHit = exact.get(replayKey({ tool: "query_logs", input }))
