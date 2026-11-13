@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url"
-import { Config, Context, Effect, Layer, Option, type Scope } from "effect"
+import { ReplaySnapshot } from "@incident/contracts"
+import { Config, Context, type DateTime, Effect, FileSystem, Layer, Option, Path, Schema, type Scope } from "effect"
 import { connect, endpointFromConfig, McpError, type McpSession, transportFor } from "./McpSession.ts"
 
 const defaultEntry = fileURLToPath(new URL("../../../../packages/mcp-observability/src/main.ts", import.meta.url))
@@ -34,6 +35,12 @@ export class ObservabilityGateway extends Context.Service<
   ObservabilityGateway,
   {
     open(options: { readonly replayCase: string }): Effect.Effect<McpSession, McpError, Scope.Scope>
+    /**
+     * The moment the telemetry behind `open` describes, when that is not the present: in replay mode the end of
+     * the snapshot's recorded window. The agent is given this as the current time, so "until now" means the end
+     * of the recording however long ago it was made. None for live telemetry.
+     */
+    asOf(options: { readonly replayCase: string }): Effect.Effect<Option.Option<DateTime.Utc>>
   }
 >()("@incident/api/mcp/ObservabilityGateway") {
   static readonly layer = Layer.effect(
@@ -57,11 +64,27 @@ export class ObservabilityGateway extends Context.Service<
         const env = { ...endpoint.env, REPLAY_DIR: replayDir.value, REPLAY_CASE: options.replayCase }
         return yield* connect("mcp-observability", () => transportFor({ ...endpoint, env }))
       })
-      return ObservabilityGateway.of({ open })
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const asOf = Effect.fn("ObservabilityGateway.asOf")(function* (options: { readonly replayCase: string }) {
+        if (endpoint._tag === "http" || Option.isNone(replayDir) || !SAFE_CASE.test(options.replayCase)) {
+          return Option.none<DateTime.Utc>()
+        }
+        // An unreadable snapshot is reported by `open`, which starts the server on the same file.
+        return yield* fs.readFileString(path.join(replayDir.value, options.replayCase, "snapshot.json")).pipe(
+          Effect.flatMap(Schema.decodeUnknownEffect(Schema.fromJsonString(ReplaySnapshot))),
+          Effect.map((snapshot) => Option.some(snapshot.window.end)),
+          Effect.catch(() => Effect.succeed(Option.none<DateTime.Utc>())),
+        )
+      })
+      return ObservabilityGateway.of({ open, asOf })
     }),
   )
 
   /** Every investigation gets a session from `make` (tests: an in-process server or a fake). */
-  static readonly layerFrom = (make: Effect.Effect<McpSession, McpError, Scope.Scope>) =>
-    Layer.succeed(ObservabilityGateway, ObservabilityGateway.of({ open: () => make }))
+  static readonly layerFrom = (
+    make: Effect.Effect<McpSession, McpError, Scope.Scope>,
+    asOf: Option.Option<DateTime.Utc> = Option.none(),
+  ) =>
+    Layer.succeed(ObservabilityGateway, ObservabilityGateway.of({ open: () => make, asOf: () => Effect.succeed(asOf) }))
 }

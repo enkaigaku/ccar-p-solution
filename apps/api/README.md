@@ -42,20 +42,20 @@ pnpm dev:api        # http://localhost:3000/docs
 
 没有 `ANTHROPIC_API_KEY`、`DATABASE_URL`、`APPROVAL_SIGNING_KEY` 时也能启动（控制台开发用），对应功能会失败并打 warning。
 
-| 环境变量                                            | 默认                           | 说明                                                                                    |
-| --------------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`                                 | —                              | 分诊与调查                                                                              |
-| `DATABASE_URL`                                      | —                              | 有则用 `@incident/rag` 的 `RetrieverLive`，否则 stub                                    |
-| `VOYAGE_API_KEY`                                    | —                              | `RetrieverLive` 需要                                                                    |
-| `APPROVAL_SIGNING_KEY`                              | —                              | ≥ 32 字符，与 mcp-ops 共用                                                              |
-| `OBSERVABILITY_MCP_URL` / `OBSERVABILITY_MCP_TOKEN` | —                              | 设置后用 Streamable HTTP；否则每次调查 stdio 启动一个 mcp-observability                 |
-| `OPS_MCP_URL` / `OPS_MCP_TOKEN`                     | —                              | 同上，针对 mcp-ops（每次执行启动一个）                                                  |
-| `OBS_REPLAY_DIR`                                    | —                              | 回放模式：mcp-observability 以 `REPLAY_DIR=<它>`、`REPLAY_CASE=<告警 fingerprint>` 启动 |
-| `AGENT_MAX_TURNS` / `AGENT_MAX_COST_USD`            | `12` / `0.6`                   | 超过后强制出报告                                                                        |
-| `INVESTIGATION_TIMEOUT`                             | `5 minutes`                    | 超时记为 failed                                                                         |
-| `MAX_CONCURRENT_INVESTIGATIONS`                     | `2`                            |                                                                                         |
-| `APPROVER_ID`                                       | `console-operator`             | 写进审批令牌的审批人；接入 OIDC 后改为登录用户                                          |
-| `API_AUDIT_LOG`                                     | `infra/.api-state/audit.jsonl` | 审计 JSONL（已 gitignore）                                                              |
+| 环境变量                                            | 默认                           | 说明                                                                                                                                       |
+| --------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ANTHROPIC_API_KEY`                                 | —                              | 分诊与调查                                                                                                                                 |
+| `DATABASE_URL`                                      | —                              | 有则用 `@incident/rag` 的 `RetrieverLive`，否则 stub                                                                                       |
+| `VOYAGE_API_KEY`                                    | —                              | `RetrieverLive` 需要                                                                                                                       |
+| `APPROVAL_SIGNING_KEY`                              | —                              | ≥ 32 字符，与 mcp-ops 共用                                                                                                                 |
+| `OBSERVABILITY_MCP_URL` / `OBSERVABILITY_MCP_TOKEN` | —                              | 设置后用 Streamable HTTP；否则每次调查 stdio 启动一个 mcp-observability                                                                    |
+| `OPS_MCP_URL` / `OPS_MCP_TOKEN`                     | —                              | 同上，针对 mcp-ops（每次执行启动一个）                                                                                                     |
+| `OBS_REPLAY_DIR`                                    | —                              | 回放模式：mcp-observability 以 `REPLAY_DIR=<它>`、`REPLAY_CASE=<告警 fingerprint>` 启动；告诉 agent 的「当前时间」取快照录制窗口的结束时刻 |
+| `AGENT_MAX_TURNS` / `AGENT_MAX_COST_USD`            | `12` / `0.6`                   | 超过后强制出报告                                                                                                                           |
+| `INVESTIGATION_TIMEOUT`                             | `5 minutes`                    | 超时记为 failed                                                                                                                            |
+| `MAX_CONCURRENT_INVESTIGATIONS`                     | `2`                            |                                                                                                                                            |
+| `APPROVER_ID`                                       | `console-operator`             | 写进审批令牌的审批人；接入 OIDC 后改为登录用户                                                                                             |
+| `API_AUDIT_LOG`                                     | `infra/.api-state/audit.jsonl` | 审计 JSONL（已 gitignore）                                                                                                                 |
 
 ## 测试
 

@@ -266,7 +266,9 @@ export class Investigator extends Context.Service<
           "## Methodology for this alert category",
           methodology.text,
         ].join("\n")
-        const now = DateTime.formatIso(yield* DateTime.now)
+        // Replayed telemetry ends when it was recorded; the agent's "now" has to be that moment, not today.
+        const asOf = yield* gateway.asOf({ replayCase: alert.fingerprint })
+        const now = DateTime.formatIso(Option.isSome(asOf) ? asOf.value : yield* DateTime.now)
         const volatile = [
           "## Alert",
           untrusted(
