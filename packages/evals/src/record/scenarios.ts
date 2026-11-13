@@ -35,18 +35,11 @@ export const p95 = (service: string) =>
  */
 const LOW_TRAFFIC_ERRORS = 0.004
 
-const percent = (
-  flag: string,
-  variant: string,
-  service: string,
-  upstream: string,
-  text: string,
-  triggerOn: string = upstream,
-): Scenario => ({
+const percent = (flag: string, variant: string, service: string, upstream: string, text: string): Scenario => ({
   name: `${flag}-${variant.replace("%", "")}`,
   flag,
   variant,
-  trigger: { promql: errorRate(triggerOn), threshold: LOW_TRAFFIC_ERRORS },
+  trigger: { promql: errorRate(upstream), threshold: LOW_TRAFFIC_ERRORS },
   alert: { alertname: "HighErrorRate", service: upstream, summary: `${upstream} error rate is elevated` },
   rootCause: { service, text, alternatives: [] },
   focus: [service, upstream],
@@ -67,10 +60,10 @@ export const Scenarios: ReadonlyArray<Scenario> = [
       "cartFailure",
       v,
       "cart",
-      "frontend",
-      `The cart service fails ${v} of EmptyCart requests, surfacing as frontend and checkout errors.`,
-      // EmptyCart only runs at checkout, so the few failures drown in the frontend's own error noise.
-      "cart",
+      // EmptyCart only runs while checkout places an order. Checkout's error rate follows cart's one for one, and
+      // the frontend's stays flat, so an alert on the frontend would point at a service that shows no errors.
+      "checkout",
+      `The cart service fails ${v} of EmptyCart requests, so checkout's PlaceOrder calls fail.`,
     ),
   ),
   {
