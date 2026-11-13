@@ -73,6 +73,15 @@ describe("scenario catalog", () => {
     }
   })
 
+  it("alerts on the service whose error rate the fault moves", () => {
+    // EmptyCart failures show up in checkout; the frontend's error rate stays flat.
+    for (const name of ["paymentFailure-50", "cartFailure-50"]) {
+      const s = findScenario(name)
+      assert.strictEqual(s?.alert.service, "checkout")
+      assert.include(s?.trigger.promql, 'service_name="checkout"')
+    }
+  })
+
   it("ids are opaque and stable", () => {
     const at = DateTime.makeUnsafe("2026-11-12T03:00:00Z")
     const id = opaqueId("fc", "paymentFailure-50", at)
