@@ -8,15 +8,10 @@ import { Judge } from "./judge/Judge.ts"
 import { Flagd } from "./record/Flagd.ts"
 import { ObservabilityMcp } from "./record/ObservabilityMcp.ts"
 import { faultsOf, recordBatch } from "./record/Recorder.ts"
-import { findScenario, Scenarios } from "./record/scenarios.ts"
+import { Scenarios } from "./record/scenarios.ts"
+import { recordedScenarioNames, selectScenarios } from "./record/selection.ts"
 
 const repoRoot = new URL("../../../", import.meta.url).pathname
-
-/** Names of the scenarios that already have a recorded case: the recorder puts the scenario name in the tags. */
-const recordedScenarios = Effect.gen(function* () {
-  const cases = yield* (yield* Datasets).cases
-  return new Set(cases.filter((c) => c.kind === "fault" && !c.synthetic).flatMap((c) => c.tags))
-})
 
 const budget = Command.make(
   "budget",
@@ -34,7 +29,7 @@ const scenarios = Command.make(
   "scenarios",
   {},
   Effect.fn(function* () {
-    const done = yield* recordedScenarios
+    const done = recordedScenarioNames(yield* (yield* Datasets).cases)
     for (const s of Scenarios) {
       const flags = faultsOf(s)
         .map((f) => `${f.flag}=${f.variant}`)
@@ -74,13 +69,8 @@ const record = Command.make(
     ),
   },
   Effect.fn(function* ({ names, all, missing, flagdFile, mcp, cooldownMinutes }) {
-    const done = missing ? yield* recordedScenarios : new Set<string>()
-    const chosen = missing
-      ? Scenarios.filter((s) => !done.has(s.name))
-      : all
-        ? Scenarios
-        : names.map((n) => findScenario(n) ?? n)
-    const unknown = chosen.filter((s) => typeof s === "string")
+    const cases = missing ? yield* (yield* Datasets).cases : []
+    const { chosen, unknown } = selectScenarios(Scenarios, cases, { names, all, missing })
     if (unknown.length > 0) return yield* Console.error(`unknown scenarios: ${unknown.join(", ")}`)
     if (chosen.length === 0) {
       return yield* missing
@@ -98,17 +88,14 @@ const record = Command.make(
     )
     const layer = Layer.mergeAll(Flagd.layerFile(flagdFile), ObservabilityMcp.layerStdio(command, args, env))
 
-    const { recorded, failed } = yield* recordBatch(
-      chosen.filter((s) => typeof s !== "string"),
-      {
-        root: packageRoot,
-        triggerTimeout: Duration.minutes(10),
-        pollEvery: Duration.seconds(15),
-        afterTrigger: Duration.minutes(2),
-        lookback: Duration.minutes(15),
-        cooldown: Duration.minutes(cooldownMinutes),
-      },
-    ).pipe(Effect.provide(layer))
+    const { recorded, failed } = yield* recordBatch(chosen, {
+      root: packageRoot,
+      triggerTimeout: Duration.minutes(10),
+      pollEvery: Duration.seconds(15),
+      afterTrigger: Duration.minutes(2),
+      lookback: Duration.minutes(15),
+      cooldown: Duration.minutes(cooldownMinutes),
+    }).pipe(Effect.provide(layer))
     for (const r of recorded) yield* Console.log(`${r.scenario} → ${r.id} (${r.calls} calls)`)
     if (failed.length > 0) {
       yield* Console.error(`not recorded: ${failed.join(", ")}`)

@@ -247,12 +247,13 @@ export const recordBatch = Effect.fn("evals.recordBatch")(function* (
     }
     yield* Effect.logInfo(`[${i + 1}/${scenarios.length}] ${scenario.name}`)
     const result = yield* recordScenario(scenario, options).pipe(
+      Effect.catchTag("TriggerTimeout", (error) => Effect.logError(error.message).pipe(Effect.as(undefined))),
+      // A recording or a trigger timeout both mean the backends answered, so only failures in a row count.
       Effect.tap(() =>
         Effect.sync(() => {
           backendFailures = 0
         }),
       ),
-      Effect.catchTag("TriggerTimeout", (error) => Effect.logError(error.message).pipe(Effect.as(undefined))),
       Effect.catchTag("McpCallError", (error) => {
         backendFailures += 1
         return backendFailures >= MAX_CONSECUTIVE_BACKEND_FAILURES

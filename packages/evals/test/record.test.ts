@@ -2,11 +2,12 @@ import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
 import { ReplaySnapshot } from "@incident/contracts"
 import { Context, DateTime, Duration, Effect, FileSystem, Layer, Path, Ref, Schema } from "effect"
-import { FaultCase } from "../src/dataset/EvalCase.ts"
+import { AdversarialCase, FaultCase } from "../src/dataset/EvalCase.ts"
 import { allOff, Flagd, FlagdError, FlagdFile, setVariant, setVariants } from "../src/record/Flagd.ts"
 import { McpCallError, ObservabilityMcp } from "../src/record/ObservabilityMcp.ts"
 import { faultsOf, opaqueId, recordBatch, recordScenario } from "../src/record/Recorder.ts"
 import { DistractorPairs, findScenario, Scenarios } from "../src/record/scenarios.ts"
+import { recordedScenarioNames, selectScenarios } from "../src/record/selection.ts"
 import { OtelDemoFlags } from "./otelDemoFlags.ts"
 
 const flagdJson = {
@@ -470,6 +471,27 @@ describe("recorder", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
 
+  it.live("a trigger timeout between backend failures resets the count", () =>
+    Effect.gen(function* () {
+      const { root, flagFile } = yield* setup
+      // paymentFailure-100 never triggers on this fake; the 50% scenarios fail on their first log query.
+      const order = scenarios(
+        "paymentFailure-50",
+        "paymentFailure-100",
+        "paymentFailure-50",
+        "paymentFailure-100",
+        "paymentFailure-50",
+      )
+      const result = yield* recordBatch(order, batchOptions(root)).pipe(
+        Effect.provide(Layer.mergeAll(Flagd.layerFile(flagFile), flakyLogs(flagFile, 99))),
+      )
+      assert.deepStrictEqual(
+        result.failed,
+        order.map((s) => s.name),
+      )
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  )
+
   it.live("stops the batch on an error other than a trigger timeout", () =>
     Effect.gen(function* () {
       const { root, seen, layer } = yield* setup
@@ -482,4 +504,65 @@ describe("recorder", () => {
       assert.deepStrictEqual(yield* Ref.get(seen), [])
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
+})
+
+describe("scenario selection", () => {
+  const faultCase = (id: string, tags: ReadonlyArray<string>, synthetic: boolean) =>
+    new FaultCase({
+      kind: "fault",
+      id,
+      snapshotId: id,
+      smoke: false,
+      groundTruth: {
+        rootCause: "x",
+        service: "payment",
+        acceptableAlternatives: [],
+        fault: { flag: "paymentFailure", variant: "50%" },
+      },
+      expect: { insufficientInformation: false, forbiddenActions: [] },
+      tags,
+      synthetic,
+    })
+  const adversarial = new AdversarialCase({
+    kind: "adversarial",
+    id: "ad-00000001",
+    snapshotId: "fc-00000001",
+    smoke: false,
+    attack: "log-injection",
+    expect: { insufficientInformation: false, forbiddenActions: [] },
+    tags: ["cartFailure-50"],
+    synthetic: false,
+  })
+  const catalogue = Scenarios.filter((s) =>
+    ["paymentFailure-50", "paymentFailure-50+adHighCpu", "cartFailure-50", "adHighCpu"].includes(s.name),
+  )
+  const names = (chosen: ReadonlyArray<{ readonly name: string }>) => chosen.map((s) => s.name)
+  const missing = { names: [], all: false, missing: true }
+
+  it("--missing skips recorded scenarios; synthetic and adversarial cases do not count as recordings", () => {
+    const cases = [
+      faultCase("fc-00000001", ["paymentFailure-50", "payment"], false),
+      faultCase("fc-00000002", ["adHighCpu", "ad"], true),
+      adversarial,
+    ]
+    assert.deepStrictEqual([...recordedScenarioNames(cases)], ["paymentFailure-50", "payment"])
+    // The distractor variant of a recorded fault is a scenario of its own.
+    assert.deepStrictEqual(names(selectScenarios(catalogue, cases, missing).chosen), [
+      "cartFailure-50",
+      "adHighCpu",
+      "paymentFailure-50+adHighCpu",
+    ])
+  })
+
+  it("--missing chooses nothing once every scenario has a case", () => {
+    const cases = catalogue.map((s, i) => faultCase(`fc-0000000${i}`, [s.name], false))
+    assert.deepStrictEqual(selectScenarios(catalogue, cases, missing), { chosen: [], unknown: [] })
+  })
+
+  it("--all takes the catalogue; names are looked up and unknown ones reported", () => {
+    assert.strictEqual(selectScenarios(catalogue, [], { names: [], all: true, missing: false }).chosen, catalogue)
+    const byName = selectScenarios(catalogue, [], { names: ["adHighCpu", "nope"], all: false, missing: false })
+    assert.deepStrictEqual(names(byName.chosen), ["adHighCpu"])
+    assert.deepStrictEqual(byName.unknown, ["nope"])
+  })
 })
