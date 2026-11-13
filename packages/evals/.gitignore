@@ -1,3 +1,4 @@
 .ledger/
 .replay/
 output/
+.record.log

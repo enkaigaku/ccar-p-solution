@@ -3,7 +3,7 @@ import { type RecordedToolCall, ReplaySnapshot } from "@incident/contracts"
 import { DateTime, Duration, Effect, FileSystem, Path, Schedule, Schema } from "effect"
 import { FaultCase } from "../dataset/EvalCase.ts"
 import { materializeSnapshot } from "../dataset/materialize.ts"
-import { Flagd } from "./Flagd.ts"
+import { type Fault, Flagd } from "./Flagd.ts"
 import { type McpCallError, ObservabilityMcp, recordCall } from "./ObservabilityMcp.ts"
 import { errorRate, p95, requestRate, type Scenario } from "./scenarios.ts"
 
@@ -38,6 +38,12 @@ export const opaqueId = (prefix: "fc", scenario: string, at: DateTime.Utc) =>
     .slice(0, 8)}`
 
 const TraceIdPattern = /\b[0-9a-f]{32}\b/g
+
+/** Every flag a scenario turns on: its fault first, then the distractors. */
+export const faultsOf = (scenario: Scenario): ReadonlyArray<Fault> => [
+  { flag: scenario.flag, variant: scenario.variant },
+  ...scenario.distractors.map((d) => ({ flag: d.flag, variant: d.variant })),
+]
 
 /** The trigger query's current value: the largest `last` across its series, or undefined without data. */
 const triggerValue = (scenario: Scenario) =>
@@ -143,9 +149,10 @@ export const recordScenario = Effect.fn("evals.recordScenario")(function* (scena
   const recorded = yield* Effect.gen(function* () {
     const baseline = yield* triggerValue(scenario)
     const injectedAt = yield* DateTime.now
-    yield* flagd.set(scenario.flag, scenario.variant)
+    const faults = faultsOf(scenario)
+    yield* flagd.set(faults)
     yield* Effect.logInfo(
-      `${scenario.name}: ${scenario.flag}=${scenario.variant}, waiting for trigger (baseline ${show(baseline)})`,
+      `${scenario.name}: ${faults.map((f) => `${f.flag}=${f.variant}`).join(", ")}, waiting for trigger (baseline ${show(baseline)})`,
     )
     const firedAt = yield* waitForTrigger(scenario, baseline, options)
     yield* Effect.sleep(options.afterTrigger)
@@ -188,9 +195,10 @@ export const recordScenario = Effect.fn("evals.recordScenario")(function* (scena
       service: scenario.rootCause.service,
       acceptableAlternatives: scenario.rootCause.alternatives,
       fault: { flag: scenario.flag, variant: scenario.variant },
+      ...(scenario.distractors.length > 0 ? { distractors: scenario.distractors } : {}),
     },
     expect: { insufficientInformation: false, forbiddenActions: [] },
-    tags: [scenario.name, scenario.rootCause.service],
+    tags: [scenario.name, scenario.rootCause.service, ...(scenario.distractors.length > 0 ? ["distractor"] : [])],
     synthetic: false,
   })
   const caseFile = path.join(options.root, "datasets", "fault", `${id}.json`)
@@ -208,18 +216,26 @@ export interface BatchOptions extends RecordOptions {
   readonly cooldown: Duration.Duration
 }
 
+/** A batch gives up after this many scenarios in a row fail on the observability backends. */
+export const MAX_CONSECUTIVE_BACKEND_FAILURES = 3
+
 /**
- * Records scenarios one after another. A scenario whose trigger never fires is reported and skipped, so it does not
- * cost the recordings after it; any other error stops the batch. Baselines are only measured on a clean system: a
- * fault left on by a manual injection or a killed run is cleared first and given the cooldown to drain.
+ * Records scenarios one after another, for hours when the whole catalogue is recorded. Before anything is injected,
+ * every flag and variant is checked against the flag file. A scenario whose trigger never fires is reported and
+ * skipped, so it does not cost the recordings after it. So is one that fails on a tool call (a backend hiccup), but
+ * MAX_CONSECUTIVE_BACKEND_FAILURES of those in a row stop the batch: the backends are down. Any other error stops
+ * the batch. Baselines are only measured on a clean system: a fault left on by a manual injection or a killed run is
+ * cleared first and given the cooldown to drain.
  */
 export const recordBatch = Effect.fn("evals.recordBatch")(function* (
   scenarios: ReadonlyArray<Scenario>,
   options: BatchOptions,
 ) {
   const flagd = yield* Flagd
+  yield* flagd.validate(scenarios.flatMap(faultsOf))
   const recorded: Array<{ readonly scenario: string; readonly id: string; readonly calls: number }> = []
   const failed: Array<string> = []
+  let backendFailures = 0
   for (const [i, scenario] of scenarios.entries()) {
     if (i === 0) {
       if (yield* flagd.reset) {
@@ -229,8 +245,20 @@ export const recordBatch = Effect.fn("evals.recordBatch")(function* (
     } else {
       yield* Effect.sleep(options.cooldown)
     }
+    yield* Effect.logInfo(`[${i + 1}/${scenarios.length}] ${scenario.name}`)
     const result = yield* recordScenario(scenario, options).pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          backendFailures = 0
+        }),
+      ),
       Effect.catchTag("TriggerTimeout", (error) => Effect.logError(error.message).pipe(Effect.as(undefined))),
+      Effect.catchTag("McpCallError", (error) => {
+        backendFailures += 1
+        return backendFailures >= MAX_CONSECUTIVE_BACKEND_FAILURES
+          ? Effect.fail(error)
+          : Effect.logError(`${scenario.name}: ${error.tool} failed: ${error.message}`).pipe(Effect.as(undefined))
+      }),
     )
     if (result === undefined) failed.push(scenario.name)
     else recorded.push({ scenario: scenario.name, ...result })

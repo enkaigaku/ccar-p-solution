@@ -1,12 +1,13 @@
 import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
 import { ReplaySnapshot } from "@incident/contracts"
-import { DateTime, Duration, Effect, FileSystem, Layer, Path, Ref, Schema } from "effect"
+import { Context, DateTime, Duration, Effect, FileSystem, Layer, Path, Ref, Schema } from "effect"
 import { FaultCase } from "../src/dataset/EvalCase.ts"
-import { allOff, Flagd, FlagdError, FlagdFile, setVariant } from "../src/record/Flagd.ts"
-import { ObservabilityMcp } from "../src/record/ObservabilityMcp.ts"
-import { opaqueId, recordBatch, recordScenario } from "../src/record/Recorder.ts"
-import { findScenario, Scenarios } from "../src/record/scenarios.ts"
+import { allOff, Flagd, FlagdError, FlagdFile, setVariant, setVariants } from "../src/record/Flagd.ts"
+import { McpCallError, ObservabilityMcp } from "../src/record/ObservabilityMcp.ts"
+import { faultsOf, opaqueId, recordBatch, recordScenario } from "../src/record/Recorder.ts"
+import { DistractorPairs, findScenario, Scenarios } from "../src/record/scenarios.ts"
+import { OtelDemoFlags } from "./otelDemoFlags.ts"
 
 const flagdJson = {
   $schema: "https://flagd.dev/schema/v0/flags.json",
@@ -42,6 +43,23 @@ describe("flagd file", () => {
     assert.instanceOf(setVariant(file, "paymentFailure", "37%"), FlagdError)
   })
 
+  it("applies several faults, or reports the first one the file lacks", () => {
+    const next = setVariants(allOff(file), [
+      { flag: "paymentFailure", variant: "100%" },
+      { flag: "adHighCpu", variant: "on" },
+    ])
+    assert(!(next instanceof FlagdError))
+    assert.strictEqual(next.flags.paymentFailure?.defaultVariant, "100%")
+    assert.strictEqual(next.flags.adHighCpu?.defaultVariant, "on")
+    assert.instanceOf(
+      setVariants(file, [
+        { flag: "adHighCpu", variant: "on" },
+        { flag: "nope", variant: "on" },
+      ]),
+      FlagdError,
+    )
+  })
+
   it.effect("rewrites the file on disk", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
@@ -50,7 +68,7 @@ describe("flagd file", () => {
       yield* fs.writeFileString(path, JSON.stringify(flagdJson))
       yield* Effect.gen(function* () {
         const flagd = yield* Flagd
-        yield* flagd.set("paymentFailure", "100%")
+        yield* flagd.set([{ flag: "paymentFailure", variant: "100%" }])
         const after = JSON.parse(yield* fs.readFileString(path))
         assert.strictEqual(after.flags.paymentFailure.defaultVariant, "100%")
         assert.strictEqual(after.flags.adHighCpu.defaultVariant, "off")
@@ -59,6 +77,19 @@ describe("flagd file", () => {
         assert.strictEqual(JSON.parse(yield* fs.readFileString(path)).flags.paymentFailure.defaultVariant, "off")
         // Nothing left to clear.
         assert.isFalse(yield* flagd.reset)
+
+        // Two faults go on in one write; validating touches nothing.
+        yield* flagd.set([
+          { flag: "paymentFailure", variant: "50%" },
+          { flag: "adHighCpu", variant: "on" },
+        ])
+        const both = JSON.parse(yield* fs.readFileString(path))
+        assert.strictEqual(both.flags.paymentFailure.defaultVariant, "50%")
+        assert.strictEqual(both.flags.adHighCpu.defaultVariant, "on")
+        const error = yield* Effect.flip(flagd.validate([{ flag: "paymentFailure", variant: "37%" }]))
+        assert.include(error.message, "37%")
+        yield* flagd.validate([{ flag: "paymentFailure", variant: "100%" }])
+        assert.strictEqual(JSON.parse(yield* fs.readFileString(path)).flags.paymentFailure.defaultVariant, "50%")
       }).pipe(Effect.provide(Flagd.layerFile(path)))
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
@@ -70,6 +101,45 @@ describe("scenario catalog", () => {
     for (const s of Scenarios) {
       assert.isNotEmpty(s.trigger.promql, s.name)
       assert.isNotEmpty(s.rootCause.text, s.name)
+    }
+  })
+
+  it("only uses flags and variants that the pinned OTel Demo version has", () => {
+    for (const s of Scenarios) {
+      for (const fault of faultsOf(s)) {
+        assert.include(OtelDemoFlags[fault.flag] ?? [], fault.variant, `${s.name}: ${fault.flag}=${fault.variant}`)
+        assert.notStrictEqual(fault.variant, "off", s.name)
+      }
+    }
+  })
+
+  it("has enough scenarios for the 40-case fault set, with room for ones that never trigger", () => {
+    assert.isAtLeast(Scenarios.length, 48)
+  })
+
+  it("distractors keep the fault's alert and label, and live in another service", () => {
+    const withDistractors = Scenarios.filter((s) => s.distractors.length > 0)
+    // No pair was dropped for naming an unknown scenario.
+    assert.strictEqual(withDistractors.length, DistractorPairs.length)
+    for (const s of withDistractors) {
+      const single = findScenario(s.name.split("+")[0] ?? "")
+      assert(single !== undefined, s.name)
+      assert.deepStrictEqual(
+        { alert: s.alert, trigger: s.trigger, rootCause: s.rootCause, flag: s.flag, variant: s.variant },
+        {
+          alert: single.alert,
+          trigger: single.trigger,
+          rootCause: single.rootCause,
+          flag: single.flag,
+          variant: single.variant,
+        },
+      )
+      for (const d of s.distractors) {
+        assert.notStrictEqual(d.flag, s.flag, s.name)
+        assert.notStrictEqual(d.service, s.rootCause.service, s.name)
+        assert.notStrictEqual(d.service, s.alert.service, s.name)
+        assert.include(s.focus, d.service, s.name)
+      }
     }
   })
 
@@ -327,6 +397,79 @@ describe("recorder", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
 
+  it.live("records a distractor scenario with both flags on and labels only the fault", () =>
+    Effect.gen(function* () {
+      const { root, flagFile, seen, layer } = yield* setup
+      const fs = yield* FileSystem.FileSystem
+      const result = yield* recordBatch(scenarios("paymentFailure-50+adHighCpu"), batchOptions(root)).pipe(
+        Effect.provide(layer),
+      )
+      assert.deepStrictEqual(result.failed, [])
+      assert.isTrue((yield* Ref.get(seen)).includes("query_logs:paymentFailure=50%,adHighCpu=on"))
+      const id = result.recorded[0]?.id ?? ""
+      const faultCase = Schema.decodeUnknownSync(Schema.fromJsonString(FaultCase))(
+        yield* fs.readFileString(`${root}/datasets/fault/${id}.json`),
+      )
+      assert.strictEqual(faultCase.groundTruth.service, "payment")
+      assert.deepStrictEqual(faultCase.groundTruth.fault, { flag: "paymentFailure", variant: "50%" })
+      assert.deepStrictEqual(faultCase.groundTruth.distractors, [{ flag: "adHighCpu", variant: "on", service: "ad" }])
+      assert.deepStrictEqual(faultCase.tags, ["paymentFailure-50+adHighCpu", "payment", "distractor"])
+      // The distractor's service is recorded too, so the red herring is there for the agent to find.
+      const snapshot = Schema.decodeUnknownSync(Schema.fromJsonString(ReplaySnapshot))(
+        yield* fs.readFileString(`${root}/fixtures/replay/${id}/snapshot.json`),
+      )
+      assert.isTrue(snapshot.calls.some((c) => c.tool === "query_logs" && c.input.service === "ad"))
+      const flags = JSON.parse(yield* fs.readFileString(flagFile)).flags
+      assert.strictEqual(flags.adHighCpu.defaultVariant, "off")
+      assert.strictEqual(flags.paymentFailure.defaultVariant, "off")
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  )
+
+  /** Fake live server whose log backend is down for the first `failures` scenarios. */
+  const flakyLogs = (flagFile: string, failures: number) =>
+    Layer.effect(
+      ObservabilityMcp,
+      Effect.gen(function* () {
+        const seen = yield* Ref.make<Array<string>>([])
+        const inner = yield* Layer.build(flagDrivenMcp(flagFile, seen))
+        const logCalls = yield* Ref.make(0)
+        return ObservabilityMcp.of({
+          call: ((tool: string, input: never) =>
+            tool === "query_logs"
+              ? Effect.flatMap(
+                  Ref.updateAndGet(logCalls, (n) => n + 1),
+                  (n) =>
+                    n <= failures
+                      ? Effect.fail(new McpCallError({ tool, message: "loki timed out", toolError: false }))
+                      : Effect.succeed({ ref: "l", totalMatched: 0, countsByLevel: {}, topMessages: [], samples: [] }),
+                )
+              : Context.get(inner, ObservabilityMcp).call(tool as "query_metrics", input)) as never,
+        })
+      }),
+    )
+
+  it.live("goes on after a backend failure, but stops when the backends stay down", () =>
+    Effect.gen(function* () {
+      const { root, flagFile } = yield* setup
+      const fs = yield* FileSystem.FileSystem
+      const flagd = Flagd.layerFile(flagFile)
+      const three = scenarios("paymentFailure-50", "paymentFailure-50", "paymentFailure-50")
+
+      // The first scenario fails on its first log query; the second records.
+      const result = yield* recordBatch(three.slice(0, 2), batchOptions(root)).pipe(
+        Effect.provide(Layer.mergeAll(flagd, flakyLogs(flagFile, 1))),
+      )
+      assert.deepStrictEqual(result.failed, ["paymentFailure-50"])
+      assert.strictEqual(result.recorded.length, 1)
+
+      const error = yield* Effect.flip(
+        recordBatch(three, batchOptions(root)).pipe(Effect.provide(Layer.mergeAll(flagd, flakyLogs(flagFile, 99)))),
+      )
+      assert.strictEqual(error._tag, "McpCallError")
+      assert.strictEqual(JSON.parse(yield* fs.readFileString(flagFile)).flags.paymentFailure.defaultVariant, "off")
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  )
+
   it.live("stops the batch on an error other than a trigger timeout", () =>
     Effect.gen(function* () {
       const { root, seen, layer } = yield* setup
@@ -335,7 +478,8 @@ describe("recorder", () => {
         recordBatch(scenarios("cartFailure-50", "paymentFailure-50"), batchOptions(root)).pipe(Effect.provide(layer)),
       )
       assert.strictEqual(error._tag, "FlagdError")
-      assert.isFalse((yield* Ref.get(seen)).some((call) => call.includes("paymentFailure=50%")))
+      // The flag file is checked before the first injection, so the batch does not start at all.
+      assert.deepStrictEqual(yield* Ref.get(seen), [])
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
 })

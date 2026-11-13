@@ -1,9 +1,19 @@
 /**
  * Fault scenarios for the OpenTelemetry Demo 3.1.0 flagd flags (`src/flagd/demo.flagd.json`).
  * Each scenario says how to inject the fault, which signal means "the alert would fire now", the alert that
- * Alertmanager would send, and the labelled root cause. `emitRawPii`, `cartMetricCardinalityOverflow` and the
- * `ai*` flags are not failure scenarios for this project and are left out.
+ * Alertmanager would send, and the labelled root cause. `emitRawPii` and the `ai*` flags are not failure scenarios
+ * for this project and are left out. A test checks every flag and variant against the 3.1.0 flag list.
+ *
+ * Two kinds: single-fault scenarios, and the same faults with a distractor, a second fault injected at the same time
+ * on a path that cannot cause the alert. The labelled root cause of a distractor scenario is still the first fault.
  */
+export interface Distractor {
+  readonly flag: string
+  readonly variant: string
+  /** The service the distractor fault lives in. */
+  readonly service: string
+}
+
 export interface Scenario {
   readonly name: string
   readonly flag: string
@@ -17,6 +27,8 @@ export interface Scenario {
   readonly rootCause: { readonly service: string; readonly text: string; readonly alternatives: ReadonlyArray<string> }
   /** Services whose logs and metrics the recorder captures in addition to the alerting service's neighbours. */
   readonly focus: ReadonlyArray<string>
+  /** Unrelated faults that are on during the recording. Empty for single-fault scenarios. */
+  readonly distractors: ReadonlyArray<Distractor>
 }
 
 // Metric names as Prometheus stores them here: the OTLP receiver is configured without unit or `_total` suffixes
@@ -43,10 +55,13 @@ const percent = (flag: string, variant: string, service: string, upstream: strin
   alert: { alertname: "HighErrorRate", service: upstream, summary: `${upstream} error rate is elevated` },
   rootCause: { service, text, alternatives: [] },
   focus: [service, upstream],
+  distractors: [],
 })
 
-export const Scenarios: ReadonlyArray<Scenario> = [
-  ...["10%", "50%", "100%"].map((v) =>
+const FailureRates = ["10%", "25%", "50%", "75%", "90%", "100%"]
+
+const SingleFaults: ReadonlyArray<Scenario> = [
+  ...FailureRates.map((v) =>
     percent(
       "paymentFailure",
       v,
@@ -55,7 +70,7 @@ export const Scenarios: ReadonlyArray<Scenario> = [
       `The payment service fails ${v} of charge requests, so checkout cannot place orders.`,
     ),
   ),
-  ...["10%", "50%", "100%"].map((v) =>
+  ...FailureRates.map((v) =>
     percent(
       "cartFailure",
       v,
@@ -78,6 +93,7 @@ export const Scenarios: ReadonlyArray<Scenario> = [
       alternatives: ["payment service is down or unreachable from checkout"],
     },
     focus: ["payment", "checkout"],
+    distractors: [],
   },
   {
     name: "adFailure",
@@ -87,6 +103,7 @@ export const Scenarios: ReadonlyArray<Scenario> = [
     alert: { alertname: "HighErrorRate", service: "frontend", summary: "frontend dependency errors are elevated" },
     rootCause: { service: "ad", text: "The ad service fails GetAds requests.", alternatives: [] },
     focus: ["ad", "frontend"],
+    distractors: [],
   },
   {
     name: "adHighCpu",
@@ -100,6 +117,7 @@ export const Scenarios: ReadonlyArray<Scenario> = [
       alternatives: ["high CPU load in the ad service"],
     },
     focus: ["ad", "frontend"],
+    distractors: [],
   },
   {
     name: "adManualGc",
@@ -113,6 +131,7 @@ export const Scenarios: ReadonlyArray<Scenario> = [
       alternatives: ["GC pauses in the ad service"],
     },
     focus: ["ad", "frontend"],
+    distractors: [],
   },
   {
     name: "productCatalogFailure",
@@ -126,6 +145,7 @@ export const Scenarios: ReadonlyArray<Scenario> = [
       alternatives: ["product-catalog returns errors for a single product id"],
     },
     focus: ["product-catalog", "frontend"],
+    distractors: [],
   },
   {
     name: "productCatalogLockContention",
@@ -139,6 +159,7 @@ export const Scenarios: ReadonlyArray<Scenario> = [
       alternatives: ["product-catalog database lock contention"],
     },
     focus: ["product-catalog", "frontend"],
+    distractors: [],
   },
   {
     name: "recommendationCacheFailure",
@@ -152,6 +173,7 @@ export const Scenarios: ReadonlyArray<Scenario> = [
       alternatives: ["recommendation cache failure causing memory growth"],
     },
     focus: ["recommendation", "frontend"],
+    distractors: [],
   },
   ...["5sec", "10sec"].map(
     (v): Scenario => ({
@@ -166,6 +188,7 @@ export const Scenarios: ReadonlyArray<Scenario> = [
         alternatives: [],
       },
       focus: ["frontend"],
+      distractors: [],
     }),
   ),
   ...["5sec", "10sec"].map(
@@ -177,9 +200,10 @@ export const Scenarios: ReadonlyArray<Scenario> = [
       alert: { alertname: "HighLatency", service: "checkout", summary: "checkout p95 latency is elevated" },
       rootCause: { service: "shipping", text: `International shipping quotes are delayed by ${v}.`, alternatives: [] },
       focus: ["shipping", "quote", "checkout"],
+      distractors: [],
     }),
   ),
-  ...["100x", "10000x"].map(
+  ...["100x", "1000x", "10000x"].map(
     (v): Scenario => ({
       name: `emailMemoryLeak-${v}`,
       flag: "emailMemoryLeak",
@@ -192,35 +216,24 @@ export const Scenarios: ReadonlyArray<Scenario> = [
         alternatives: [],
       },
       focus: ["email", "checkout"],
-    }),
-  ),
-  ...["1sec", "5sec"].map(
-    (v): Scenario => ({
-      name: `kafkaQueueProblems-${v}`,
-      flag: "kafkaQueueProblems",
-      variant: v,
-      trigger: { promql: 'sum(kafka_consumer_lag{topic="orders"})', threshold: 100 },
-      alert: { alertname: "ConsumerLag", service: "fraud-detection", summary: "orders consumer lag is growing" },
-      rootCause: {
-        service: "fraud-detection",
-        text: "The fraud-detection consumer is throttled, so lag on the orders topic climbs.",
-        alternatives: ["slow Kafka consumer in fraud-detection"],
-      },
-      focus: ["fraud-detection", "accounting", "checkout", "kafka"],
+      distractors: [],
     }),
   ),
   {
-    name: "kafkaConsumerDead",
-    flag: "kafkaConsumerDead",
+    // 3.1.0 has one strength ("on") and no kafkaConsumerDead flag. Checkout sends a burst of extra messages for each
+    // order while the consumers sleep before each message.
+    name: "kafkaQueueProblems",
+    flag: "kafkaQueueProblems",
     variant: "on",
     trigger: { promql: 'sum(kafka_consumer_lag{topic="orders"})', threshold: 100 },
     alert: { alertname: "ConsumerLag", service: "fraud-detection", summary: "orders consumer lag is growing" },
     rootCause: {
       service: "fraud-detection",
-      text: "fraud-detection left the orders consumer group, so nothing consumes and lag climbs.",
-      alternatives: ["the orders consumer group has zero members"],
+      text: "Checkout floods the orders Kafka topic with extra messages while the fraud-detection consumer is slowed down, so consumer lag on the orders topic spikes.",
+      alternatives: ["checkout overproduces messages to the orders topic", "slow Kafka consumer in fraud-detection"],
     },
-    focus: ["fraud-detection", "checkout", "kafka"],
+    focus: ["fraud-detection", "accounting", "checkout", "kafka"],
+    distractors: [],
   },
   {
     name: "failedReadinessProbe",
@@ -234,6 +247,7 @@ export const Scenarios: ReadonlyArray<Scenario> = [
       alternatives: ["cart readiness probe failures"],
     },
     focus: ["cart", "frontend"],
+    distractors: [],
   },
   {
     name: "loadGeneratorFloodHomepage",
@@ -247,7 +261,54 @@ export const Scenarios: ReadonlyArray<Scenario> = [
       alternatives: ["a traffic spike on the homepage"],
     },
     focus: ["frontend", "load-generator"],
+    distractors: [],
   },
+]
+
+/**
+ * [fault, distractor]. The distractor must not move the fault's alert signal: error faults are paired with latency
+ * faults or with errors on a path the alerting service does not call, and the other way round. For example, adFailure
+ * is not paired with paymentFailure, because "frontend dependency errors" would then have two true causes.
+ */
+export const DistractorPairs: ReadonlyArray<readonly [fault: string, distractor: string]> = [
+  ["paymentFailure-25", "imageSlowLoad-5sec"],
+  ["paymentFailure-50", "adHighCpu"],
+  ["paymentFailure-75", "adFailure"],
+  ["paymentFailure-90", "recommendationCacheFailure"],
+  ["paymentFailure-100", "productCatalogLockContention"],
+  ["paymentUnreachable", "adManualGc"],
+  ["paymentUnreachable", "imageSlowLoad-10sec"],
+  ["cartFailure-25", "productCatalogLockContention"],
+  ["cartFailure-50", "adFailure"],
+  ["cartFailure-75", "adHighCpu"],
+  ["cartFailure-100", "recommendationCacheFailure"],
+  ["adFailure", "intlShippingSlowdown-5sec"],
+  ["adHighCpu", "cartFailure-50"],
+  ["productCatalogFailure", "adHighCpu"],
+  ["productCatalogLockContention", "paymentFailure-50"],
+  ["recommendationCacheFailure", "cartFailure-50"],
+  ["intlShippingSlowdown-10sec", "adFailure"],
+  ["imageSlowLoad-10sec", "paymentFailure-50"],
+  ["emailMemoryLeak-1000x", "adManualGc"],
+  ["kafkaQueueProblems", "adHighCpu"],
+  ["failedReadinessProbe", "intlShippingSlowdown-5sec"],
+]
+
+const withDistractor = (fault: Scenario, distractor: Scenario): Scenario => ({
+  ...fault,
+  name: `${fault.name}+${distractor.name}`,
+  focus: [...new Set([...fault.focus, ...distractor.focus])],
+  distractors: [{ flag: distractor.flag, variant: distractor.variant, service: distractor.rootCause.service }],
+})
+
+export const Scenarios: ReadonlyArray<Scenario> = [
+  ...SingleFaults,
+  // A pair that names an unknown scenario is dropped here; a test checks that none is.
+  ...DistractorPairs.flatMap(([faultName, distractorName]) => {
+    const fault = SingleFaults.find((s) => s.name === faultName)
+    const distractor = SingleFaults.find((s) => s.name === distractorName)
+    return fault === undefined || distractor === undefined ? [] : [withDistractor(fault, distractor)]
+  }),
 ]
 
 export const findScenario = (name: string) => Scenarios.find((s) => s.name === name)

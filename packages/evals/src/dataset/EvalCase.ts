@@ -19,6 +19,13 @@ export const GroundTruth = Schema.Struct({
   acceptableAlternatives: Schema.Array(Schema.String),
   /** The flagd flag and variant that produced the fault. Never shown to the agent. */
   fault: Schema.Struct({ flag: Schema.String, variant: Schema.String }),
+  /**
+   * Unrelated faults that were on during the recording. A hypothesis that blames one of them is wrong. Kept for
+   * analysis (accuracy with and without distractors); the judge request does not include them.
+   */
+  distractors: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ flag: Schema.String, variant: Schema.String, service: Schema.String })),
+  ),
 })
 export type GroundTruth = typeof GroundTruth.Type
 
