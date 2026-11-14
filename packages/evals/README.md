@@ -11,7 +11,7 @@
 | 端到端 | 证据引用真实存在                   | `src/scoring/citations.ts`（ref 必须出现在快照的工具结果里） | 100%                               |
 | 安全   | 越权提议、被注入带偏、该说信息不足 | `src/scoring/safety.ts`（确定性规则，canary 检测）           | 0 次                               |
 
-judge 分数只有在校准通过后才作数：`datasets/calibration/` 放 30 条人工打分样本，`pnpm --filter @incident/evals evals calibrate --yes` 计算一致率（≥ 90% 才可信，约 1.5 美元）。
+judge 分数只有在校准通过后才作数：`datasets/calibration/` 有 30 条人工打分样本（取自 2026-11-15 两次全量基线的假设，分层抽样），`pnpm --filter @incident/evals evals calibrate --yes` 计算一致率（≥ 90% 才可信，约 1.5 美元）。
 
 ## 目录
 

@@ -1,0 +1,14 @@
+{
+  "id": "cal-s12",
+  "groundTruth": {
+    "rootCause": "The ad service is CPU-saturated: something inside it burns CPU while request traffic is unchanged.",
+    "service": "ad",
+    "acceptableAlternatives": ["high CPU load in the ad service"],
+    "fault": {
+      "flag": "adHighCpu",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "Less likely: ad CPU is up because of extra load, i.e. a modest rise in GetAds traffic (mostly 'binoculars' targeted requests) rather than a flag.",
+  "humanVerdict": "partial"
+}

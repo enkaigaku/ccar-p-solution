@@ -1,0 +1,17 @@
+{
+  "id": "cal-s09",
+  "groundTruth": {
+    "rootCause": "The email service leaks memory and slows down or restarts.",
+    "service": "email",
+    "acceptableAlternatives": [
+      "the email service is degraded: its order confirmation requests are slow",
+      "the email service keeps restarting"
+    ],
+    "fault": {
+      "flag": "emailMemoryLeak",
+      "variant": "10000x"
+    }
+  },
+  "hypothesis": "The checkout slowdown is a knock-on effect of slow email calls, not a separate fault. Checkout p95 rose from about 70 ms to 242 ms at the same moment email latency rose.",
+  "humanVerdict": "match"
+}

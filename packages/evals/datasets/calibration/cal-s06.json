@@ -1,0 +1,14 @@
+{
+  "id": "cal-s06",
+  "groundTruth": {
+    "rootCause": "Checkout cannot reach the payment service (connection refused / unavailable).",
+    "service": "payment",
+    "acceptableAlternatives": ["payment service is down or unreachable from checkout"],
+    "fault": {
+      "flag": "paymentUnreachable",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "The email service is unstable (5 container restarts) and could be adding to the problem. This is unlikely to cause the alert: orders stopped before the payment step, which comes before the confirmation email is sent.",
+  "humanVerdict": "miss"
+}

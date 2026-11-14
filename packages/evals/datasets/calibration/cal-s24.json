@@ -1,0 +1,14 @@
+{
+  "id": "cal-s24",
+  "groundTruth": {
+    "rootCause": "The load generator floods the homepage with requests, multiplying the frontend's request rate.",
+    "service": "load-generator",
+    "acceptableAlternatives": ["a traffic spike on the homepage"],
+    "fault": {
+      "flag": "loadGeneratorFloodHomepage",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "The load generator's `loadGeneratorFloodHomepage` flag appears to be on, so it is flooding the home page with synthetic requests. Starting around 08:28-08:29, this took frontend traffic from about 29 req/s to about 73 req/s. The frontend itself is healthy: it returns no errors and has not restarted. I've proposed turning the flag off; nothing runs until a human approves it.",
+  "humanVerdict": "match"
+}

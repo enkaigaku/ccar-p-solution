@@ -1,0 +1,14 @@
+{
+  "id": "cal-s17",
+  "groundTruth": {
+    "rootCause": "Lock contention on the product catalog database slows product-catalog requests.",
+    "service": "product-catalog",
+    "acceptableAlternatives": ["product-catalog database lock contention"],
+    "fault": {
+      "flag": "productCatalogLockContention",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "Less likely: the recommendation service is unstable on its own. It shows 8 container restarts and its p95 jumped about a minute before product-catalog's. But it calls product-catalog, and checkout, which does not call recommendation, slowed down too. So recommendation is more likely a symptom, and the restarts may have nothing to do with this alert.",
+  "humanVerdict": "miss"
+}

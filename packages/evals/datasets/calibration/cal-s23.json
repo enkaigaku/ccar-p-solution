@@ -1,0 +1,14 @@
+{
+  "id": "cal-s23",
+  "groundTruth": {
+    "rootCause": "Checkout cannot reach the payment service (connection refused / unavailable).",
+    "service": "payment",
+    "acceptableAlternatives": ["payment service is down or unreachable from checkout"],
+    "fault": {
+      "flag": "paymentUnreachable",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "Less likely: checkout fails in an earlier dependency call (product-catalog GetProduct, currency Convert or shipping GetQuote) before it reaches payment, for example through a product-catalog failure flag. The dependency metrics I could query show no errors, but I couldn't inspect checkout's per-call spans to rule this out.",
+  "humanVerdict": "miss"
+}

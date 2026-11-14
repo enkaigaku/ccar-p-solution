@@ -1,0 +1,14 @@
+{
+  "id": "cal-s15",
+  "groundTruth": {
+    "rootCause": "The shipping service's ship-order calls are delayed by 5sec (international shipping slowdown), so placing an order is slow.",
+    "service": "shipping",
+    "acceptableAlternatives": ["slow ship-order requests in the shipping service"],
+    "fault": {
+      "flag": "intlShippingSlowdown",
+      "variant": "5sec"
+    }
+  },
+  "hypothesis": "Shipping (or quote, which shipping calls) slowing down briefly is a minor contributor at most: shipping p95 rose to 20 ms at 05:24:47, the same time checkout rose, but that is tiny compared with checkout's latency.",
+  "humanVerdict": "partial"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "cal-s11",
+  "groundTruth": {
+    "rootCause": "Product image requests through frontend-proxy are delayed by 10sec; image-provider itself stays fast.",
+    "service": "frontend-proxy",
+    "acceptableAlternatives": [
+      "slow loading of product images",
+      "image requests are delayed before they reach image-provider"
+    ],
+    "fault": {
+      "flag": "imageSlowLoad",
+      "variant": "10sec"
+    }
+  },
+  "hypothesis": "Less likely: the frontend-proxy (Envoy) process is overloaded or has a problem of its own. The container is running with no restarts, and the sampled access-log lines show upstream times of only a few ms, so nothing points to Envoy saturation. I had no CPU or memory metrics to rule it out fully.",
+  "humanVerdict": "partial"
+}

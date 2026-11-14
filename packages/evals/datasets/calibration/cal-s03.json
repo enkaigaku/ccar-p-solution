@@ -1,0 +1,14 @@
+{
+  "id": "cal-s03",
+  "groundTruth": {
+    "rootCause": "The cart service fails 25% of EmptyCart requests, so checkout's PlaceOrder calls fail.",
+    "service": "cart",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "cartFailure",
+      "variant": "25%"
+    }
+  },
+  "hypothesis": "A feature flag such as cartFailure may have made cart's EmptyCart use a bad Redis connection. I consider this less likely: later EmptyCart calls (for example 17:15:08 and 17:16:11) went through without errors, while a flag that is on would make every one fail. I could not read flag state to rule it out.",
+  "humanVerdict": "match"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "cal-s21",
+  "groundTruth": {
+    "rootCause": "Product image requests through frontend-proxy are delayed by 5sec; image-provider itself stays fast.",
+    "service": "frontend-proxy",
+    "acceptableAlternatives": [
+      "slow loading of product images",
+      "image requests are delayed before they reach image-provider"
+    ],
+    "fault": {
+      "flag": "imageSlowLoad",
+      "variant": "5sec"
+    }
+  },
+  "hypothesis": "Envoy fault injection in frontend-proxy adds a ~5 s delay to product image requests (/images/products/*), most likely because the imageSlowLoad flag is on. The backends are not involved: image-provider answers right away, and the delay is added in the proxy, which pushes frontend-proxy p95 from ~36 ms to ~4 s starting at 04:52.",
+  "humanVerdict": "match"
+}

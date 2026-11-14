@@ -1,0 +1,14 @@
+{
+  "id": "cal-s29",
+  "groundTruth": {
+    "rootCause": "The load generator floods the homepage with requests, multiplying the frontend's request rate.",
+    "service": "load-generator",
+    "acceptableAlternatives": ["a traffic spike on the homepage"],
+    "fault": {
+      "flag": "loadGeneratorFloodHomepage",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "A real rise in user traffic (or a retry loop) coming in through frontend-proxy could cause the spike instead. This is less likely: there are no errors that would trigger retries, frontend and frontend-proxy show no restarts or image changes, and the load-generator's flood logs explain the increase.",
+  "humanVerdict": "partial"
+}

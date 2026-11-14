@@ -1,0 +1,14 @@
+{
+  "id": "cal-s05",
+  "groundTruth": {
+    "rootCause": "The shipping service's ship-order calls are delayed by 10sec (international shipping slowdown), so placing an order is slow.",
+    "service": "shipping",
+    "acceptableAlternatives": ["slow ship-order requests in the shipping service"],
+    "fault": {
+      "flag": "intlShippingSlowdown",
+      "variant": "10sec"
+    }
+  },
+  "hypothesis": "Most likely, but weakly supported: the shipping service's ShipOrder call is sometimes slow and drags out checkout PlaceOrder. In one order the gap between 'payment went through' (05:39:04.376) and shipping's 'Tracking ID Created' (05:39:14.381) was about 10 s, while other orders finished in about 10 ms. Shipping's overall p95 hides this because most of its calls are fast GetQuote requests. This is a single sample and it was logged after the alert started, so it does not explain the alert by itself.",
+  "humanVerdict": "match"
+}

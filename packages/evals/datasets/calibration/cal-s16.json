@@ -1,0 +1,14 @@
+{
+  "id": "cal-s16",
+  "groundTruth": {
+    "rootCause": "The load generator floods the homepage with requests, multiplying the frontend's request rate.",
+    "service": "load-generator",
+    "acceptableAlternatives": ["a traffic spike on the homepage"],
+    "fault": {
+      "flag": "loadGeneratorFloodHomepage",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "The loadGeneratorFloodHomepage flag in flagd is on, so the load generator is flooding the frontend home page (each flood is 100 requests). The spike is synthetic traffic, not real users and not a frontend fault. Frontend request rate rose from about 29 req/s to 77 req/s from about 11:18, and frontend errors stayed low at about 0.05 req/s. The log tool returned the same result whatever time window I gave it, so I couldn't confirm the flood lines are missing before 11:18. A proposal to turn the flag off is waiting for approval.",
+  "humanVerdict": "match"
+}

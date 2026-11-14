@@ -1,0 +1,14 @@
+{
+  "id": "cal-s27",
+  "groundTruth": {
+    "rootCause": "Full manual garbage collections in the ad service pause it and raise latency.",
+    "service": "ad",
+    "acceptableAlternatives": ["GC pauses in the ad service"],
+    "fault": {
+      "flag": "adManualGc",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "A less likely contributor: checkout latency is also rising (p95 went from about 40 ms to 91 ms) and may add to frontend latency on checkout requests. I didn't check checkout's own callees (payment, email, shipping), and the rise looks small next to the ad jump.",
+  "humanVerdict": "miss"
+}

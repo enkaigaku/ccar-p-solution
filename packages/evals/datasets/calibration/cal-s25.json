@@ -1,0 +1,14 @@
+{
+  "id": "cal-s25",
+  "groundTruth": {
+    "rootCause": "The recommendation service cache fails, so it leaks memory and slows down.",
+    "service": "recommendation",
+    "acceptableAlternatives": ["recommendation cache failure causing memory growth"],
+    "fault": {
+      "flag": "recommendationCacheFailure",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "A recommendationCacheFailure flag change is what drives recommendation's memory growth and OOM restarts. This is not confirmed: product-catalog traffic did not rise; it went slightly down.",
+  "humanVerdict": "match"
+}
