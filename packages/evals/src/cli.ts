@@ -5,7 +5,7 @@ import { BudgetGuard, BudgetPolicy } from "./budget/Budget.ts"
 import { Datasets, packageRoot } from "./dataset/Datasets.ts"
 import { calibrate } from "./judge/calibration.ts"
 import { Judge } from "./judge/Judge.ts"
-import { Flagd, servedVariantsFrom } from "./record/Flagd.ts"
+import { Flagd } from "./record/Flagd.ts"
 import { ObservabilityMcp } from "./record/ObservabilityMcp.ts"
 import { faultsOf, recordBatch } from "./record/Recorder.ts"
 import { Scenarios } from "./record/scenarios.ts"
@@ -93,18 +93,15 @@ const record = Command.make(
     const env = Object.fromEntries(
       Object.entries(process.env).filter((e): e is [string, string] => e[1] !== undefined && e[0] !== "REPLAY_DIR"),
     )
-    const served = Option.isSome(flagdUrl)
-      ? yield* servedVariantsFrom(flagdUrl.value).pipe(Effect.provide(NodeHttpClient.layerUndici))
-      : undefined
-    if (served === undefined) {
+    if (Option.isNone(flagdUrl)) {
       yield* Console.error(
         "no --flagd-url: injections are not checked against flagd, a dead file watcher goes unnoticed",
       )
     }
-    const layer = Layer.mergeAll(
-      Flagd.layerFile(flagdFile, { served }),
-      ObservabilityMcp.layerStdio(command, args, env),
-    )
+    const flagd = Option.isSome(flagdUrl)
+      ? Flagd.layerVerified(flagdFile, flagdUrl.value).pipe(Layer.provide(NodeHttpClient.layerUndici))
+      : Flagd.layerFile(flagdFile)
+    const layer = Layer.mergeAll(flagd, ObservabilityMcp.layerStdio(command, args, env))
 
     const { recorded, failed } = yield* recordBatch(chosen, {
       root: packageRoot,

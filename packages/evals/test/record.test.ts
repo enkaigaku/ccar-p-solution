@@ -210,6 +210,41 @@ describe("flagd follows the file", () => {
     ),
   )
 
+  it.live("keeps the HTTP client alive for every check, not only while the layer is built", () =>
+    withFlagFile((path, read) =>
+      Effect.gen(function* () {
+        // Like the undici client: it stops working once the scope it was built in closes.
+        const alive = yield* Ref.make(false)
+        const calls = yield* Ref.make(0)
+        const scopedClient = Layer.effect(
+          HttpClient.HttpClient,
+          Effect.as(
+            Effect.acquireRelease(Ref.set(alive, true), () => Ref.set(alive, false)),
+            HttpClient.make((request) =>
+              Effect.gen(function* () {
+                if (!(yield* Ref.get(alive))) return yield* Effect.die("The client is destroyed")
+                yield* Ref.update(calls, (n) => n + 1)
+                const flags = Object.fromEntries(Object.entries(yield* read).map(([name, v]) => [name, { variant: v }]))
+                return HttpClientResponse.fromWeb(request, new Response(JSON.stringify({ flags }), { status: 200 }))
+              }),
+            ),
+          ),
+        )
+        yield* Effect.gen(function* () {
+          const flagd = yield* Flagd
+          yield* flagd.set(on)
+          assert.isTrue(yield* flagd.reset)
+        }).pipe(
+          Effect.provide(
+            Flagd.layerVerified(path, "http://flagd.test", Duration.millis(200)).pipe(Layer.provide(scopedClient)),
+          ),
+        )
+        assert.isAtLeast(yield* Ref.get(calls), 2)
+        assert.isFalse(yield* Ref.get(alive))
+      }),
+    ),
+  )
+
   it.effect("asks flagd's evaluation API for every flag's variant", () =>
     Effect.gen(function* () {
       const urls = yield* Ref.make<Array<string>>([])

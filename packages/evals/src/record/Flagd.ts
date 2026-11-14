@@ -107,6 +107,13 @@ export class Flagd extends Context.Service<
     readonly reset: Effect.Effect<boolean, FlagdError>
   }
 >()("@incident/evals/record/Flagd") {
+  /**
+   * `layerFile` that checks every write against flagd's evaluation API at `flagdUrl`. The HTTP client is used for as
+   * long as this layer lives, so provide it to the layer (`Layer.provide`), not to a single effect.
+   */
+  static readonly layerVerified = (path: string, flagdUrl: string, settle?: Duration.Duration) =>
+    Layer.unwrap(Effect.map(servedVariantsFrom(flagdUrl), (served) => Flagd.layerFile(path, { served, settle })))
+
   static readonly layerFile = (path: string, options: FlagdOptions = {}) =>
     Layer.effect(
       Flagd,
