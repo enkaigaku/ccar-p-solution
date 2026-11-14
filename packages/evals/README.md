@@ -52,20 +52,39 @@ src/record/              flagd 注入、MCP 客户端、录制器、故障场景
    ```
 
 2. 按 `packages/mcp-observability/README.md` 配好实时后端地址（不要设置 `REPLAY_DIR`）。
-3. 查看场景并录制。G1 验收先录 3 条，每条约 10–20 分钟（等触发 ≤ 10 分钟、故障保持 2 分钟、场景间冷却 10 分钟）。快照窗口从注入前 4 分钟开始，冷却时间必须长于「4 分钟 + 3 分钟 rate 窗口 + 约 1 分钟指标延迟」，否则快照里会混入上一个场景的故障：
+3. 查看场景并录制。每条约 13–22 分钟（等触发 ≤ 10 分钟、故障保持 2 分钟、场景间冷却 10 分钟）。快照窗口从注入前 4 分钟开始，冷却时间必须长于「4 分钟 + 3 分钟 rate 窗口 + 约 1 分钟指标延迟」，否则快照里会混入上一个场景的故障：
 
    ```bash
-   pnpm --filter @incident/evals evals scenarios
+   pnpm --filter @incident/evals evals scenarios          # ✓ 表示已有录制好的用例
    pnpm --filter @incident/evals record paymentFailure-50 cartFailure-50 adHighCpu
    ```
 
-   录制器修改 `infra/.otel-demo/src/flagd/demo.flagd.json` 注入故障，无论成功与否最后都会把所有 flag 复位为 `off`。可用 `--flagd-file`、`--mcp "<命令>"`、`--cooldown-minutes` 覆盖默认值。
+   录全部 51 个场景要 11–18 小时，适合挂一晚上。`--missing` 只录还没有用例的场景，中断后重跑同一条命令即可续录；`caffeinate -i` 防止 Mac 休眠：
+
+   ```bash
+   caffeinate -i pnpm --filter @incident/evals record --missing 2>&1 | tee -a packages/evals/.record.log
+   ```
+
+   录制器修改 `infra/.otel-demo/src/flagd/demo.flagd.json` 注入故障，无论成功与否最后都会把所有 flag 复位为 `off`。开始前先核对所有场景的 flag 和 variant 在该文件里都存在，缺一个就不启动。触发超时或某次工具调用失败的场景会被跳过并在最后列出，连续 3 个场景因工具调用失败则中止（后端挂了）。可用 `--flagd-file`、`--mcp "<命令>"`、`--cooldown-minutes` 覆盖默认值。
 4. 复核新生成的 `datasets/fault/<id>.json`：根因描述是否准确，挑 1–2 条改成 `"smoke": true`，然后提交用例和 `fixtures/replay/<id>/`。
 5. 触发条件是相对的：录制器在注入故障前先量一次触发查询的基线，注入后数值比基线高出场景的 `threshold` 才算触发，所以阈值不依赖本机的流量大小。某个场景超时不会中断后面的场景，报错里带有基线和观察到的最高值（`baseline …, highest seen …`），据此调整 `src/record/scenarios.ts` 里的阈值；显示 `no data` 说明查询的指标在本机不存在。
 6. 每个服务录三次日志：`error`、`warn` 和不带级别。`level` 在实时查询里是精确匹配，很多服务把失败请求记在 `warn`，回放时按级别查询只会命中同级别的录制。
-7. 指标名以本仓库 Prometheus 的写法为准（OTLP 接收端不加单位和 `_total` 后缀）：`traces_span_metrics_calls`、`traces_span_metrics_duration_bucket`。demo 的 span 指标约每分钟到一次，rate 窗口用 3 分钟。错误率类场景已按真实流量校准；延迟类和 Kafka 类场景的阈值还没有在真实环境里确认过。
+7. 指标名以本仓库 Prometheus 的写法为准（OTLP 接收端不加单位和 `_total` 后缀）：`traces_span_metrics_calls`、`traces_span_metrics_duration_bucket`。demo 的 span 指标约每分钟到一次，rate 窗口用 3 分钟。各场景的触发条件见下面的「场景目录」。
 
-目前目录里有 22 个场景（单 flag 的不同强度），达到 ≥ 40 条还需要组合场景和重复录制，在拿到首批真实快照后补。
+### 场景目录
+
+`src/record/scenarios.ts` 里有 51 个场景，按 OTel Demo 3.1.0 的 flag 清单校验（`test/otelDemoFlags.ts`，升级 demo 版本时一起更新）：
+
+- 25 个单故障场景：每个 flag 的各档强度。
+- 26 个带干扰项的场景（名字是 `故障+干扰项`）：同时打开第二个与告警无关的故障，例如 checkout 错误率告警的同时 ad 服务 CPU 飙高。标准根因仍是第一个故障，agent 把干扰项当成根因算错。干扰项必须不影响告警信号，配对规则见 `DistractorPairs` 的注释。用例的 `groundTruth.distractors` 记录干扰项，tag 带 `distractor`，便于分开统计两类用例的准确率。快照里额外录一条干扰项自己的触发查询。
+
+目标是 ≥ 40 条故障用例，多出的场景留给触发不了的情况。
+
+触发条件按 2026-11-14 的一次真实录制校准过，几条容易踩的坑：
+
+- 服务级 p95 会被占比小的慢 span 稀释，也会被 flagd 的长连接 span（`flagd.evaluation.v2.Service/EventStream`，约 10 分钟）污染。延迟类场景的触发查询因此按具体 span 过滤（`spanP95`）。
+- `adHighCpu` 不影响延迟，触发看 `jvm_cpu_recent_utilization`；`loadGeneratorFloodHomepage` 不影响延迟，触发看首页请求率；`imageSlowLoad` 的延迟加在 frontend-proxy 上，image-provider 和 frontend 的 p95 都不变。
+- `productCatalogFailure`、`kafkaQueueProblems`、`failedReadinessProbe` 在 docker compose 部署下没有任何可观测的变化（没有错误 span；核心 compose 不带 Kafka；没有组件响应 readiness probe），不在目录里。
 
 ## 尚未打通的部分
 

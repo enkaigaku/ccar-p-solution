@@ -49,15 +49,15 @@ Incident Copilot 是一个值班 SRE 助手：告警触发后，它检索 runboo
 
 **SLO（初始值）**
 
-| 指标 | 目标 | 测量方式 |
-| --- | --- | --- |
-| 分诊延迟 p95 | ≤ 5 秒 | OTel span 时长 |
-| 首份调查报告 p95 | ≤ 90 秒 | OTel span 时长 |
-| 根因 top-3 命中率 | ≥ 85% | 离线评估集 |
-| 单次调查成本 | ≤ 0.30 美元 | token 用量 × 单价 |
-| prompt 缓存命中率 | ≥ 70% | `cache_read_input_tokens` |
-| API 可用性 | 99.5%（演示环境） | 健康检查 |
-| 未审批写操作 | 0 | 审计日志 |
+| 指标              | 目标              | 测量方式                  |
+| ----------------- | ----------------- | ------------------------- |
+| 分诊延迟 p95      | ≤ 5 秒            | OTel span 时长            |
+| 首份调查报告 p95  | ≤ 90 秒           | OTel span 时长            |
+| 根因 top-3 命中率 | ≥ 85%             | 离线评估集                |
+| 单次调查成本      | ≤ 0.30 美元       | token 用量 × 单价         |
+| prompt 缓存命中率 | ≥ 70%             | `cache_read_input_tokens` |
+| API 可用性        | 99.5%（演示环境） | 健康检查                  |
+| 未审批写操作      | 0                 | 审计日志                  |
 
 **非功能需求**：模型不可用时自动降级（fallback 模型，再退到只给 runbook 检索结果）；所有输入输出保留审计记录 90 天；日志中的 PII 在进入模型前脱敏。
 
@@ -75,18 +75,18 @@ Incident Copilot 是一个值班 SRE 助手：告警触发后，它检索 runboo
 
 全栈 TypeScript：后端统一用 Effect 4，前端用 TanStack Start 1。版本号为 2026-11-11 在 npm 上确认的最新稳定版，用 lockfile 锁定，升级走单独 PR 并跑评估。
 
-| 层 | 选型 | 版本 | 用途 |
-| --- | --- | --- | --- |
-| 运行时 | Node.js + pnpm workspace + Turborepo | Node 24 LTS | monorepo 构建与缓存 |
-| 后端框架 | `effect`（`effect/http-api`） | 4.1.4 | HTTP API、依赖注入、错误与重试 |
-| Claude 接入 | 官方 `@anthropic-ai/sdk`，封装成 Effect Service（`ClaudeClient`） | 1.8.0 | Messages API、Tool Runner、流式、缓存、effort、fallbacks、各类 beta 功能 |
-| MCP | 官方 `@modelcontextprotocol/sdk`（server 与 client） | 1.32.2 | 两个 MCP server；api 侧 client 封装成 Effect Service（`McpGateway`） |
-| 可观测性 | `@effect/opentelemetry` + OTel Collector；SDK 自带 OTel 支持 | 4.1.3 | 编排 span + SDK 的 GenAI span 统一导出 |
-| 前端 | `@tanstack/react-start` | 1.169.5 | SSR、server function、调查过程 SSE 展示 |
-| 向量与全文检索 | Postgres 17 + pgvector + `tsvector` | — | 混合检索、业务数据、审计表 |
-| Embedding / Rerank | Voyage AI | — | Anthropic 不提供 embedding 模型 |
-| 评估 | promptfoo + Vitest | — | 端到端评估与检索单元评估 |
-| 观测后端 | Grafana + Tempo + Loki + Prometheus | — | 与 OTel Demo 共用一套 |
+| 层                 | 选型                                                              | 版本        | 用途                                                                     |
+| ------------------ | ----------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------ |
+| 运行时             | Node.js + pnpm workspace + Turborepo                              | Node 24 LTS | monorepo 构建与缓存                                                      |
+| 后端框架           | `effect`（`effect/http-api`）                                     | 4.1.4       | HTTP API、依赖注入、错误与重试                                           |
+| Claude 接入        | 官方 `@anthropic-ai/sdk`，封装成 Effect Service（`ClaudeClient`） | 1.8.0       | Messages API、Tool Runner、流式、缓存、effort、fallbacks、各类 beta 功能 |
+| MCP                | 官方 `@modelcontextprotocol/sdk`（server 与 client）              | 1.32.2      | 两个 MCP server；api 侧 client 封装成 Effect Service（`McpGateway`）     |
+| 可观测性           | `@effect/opentelemetry` + OTel Collector；SDK 自带 OTel 支持      | 4.1.3       | 编排 span + SDK 的 GenAI span 统一导出                                   |
+| 前端               | `@tanstack/react-start`                                           | 1.169.5     | SSR、server function、调查过程 SSE 展示                                  |
+| 向量与全文检索     | Postgres 17 + pgvector + `tsvector`                               | —           | 混合检索、业务数据、审计表                                               |
+| Embedding / Rerank | Voyage AI                                                         | —           | Anthropic 不提供 embedding 模型                                          |
+| 评估               | promptfoo + Vitest                                                | —           | 端到端评估与检索单元评估                                                 |
+| 观测后端           | Grafana + Tempo + Loki + Prometheus                               | —           | 与 OTel Demo 共用一套                                                    |
 
 选官方 SDK 而不是 `@effect/ai-anthropic`：本项目是围绕 Claude 生态的学习项目，直接使用官方 SDK 才能接触到原生的 API 形态（缓存断点、thinking 块、stop\_reason、新 beta 功能）。`ClaudeClient` Service 只做薄封装：把 Promise 转成 Effect、把 SDK 的类型化异常映射成 Effect 错误（可重试与不可重试分开），不再另套一层抽象。
 
@@ -98,12 +98,12 @@ Incident Copilot 是一个值班 SRE 助手：告警触发后，它检索 runboo
 
 **模型路由**
 
-| 环节 | 模型 | effort | 理由 |
-| --- | --- | --- | --- |
-| 告警分诊（分类、去重） | `claude-haiku-5-5` | low | 高频、结构化输出、对延迟敏感 |
-| 根因调查（agent loop） | `claude-opus-5-5` | high | 多步推理 + 工具调用，错判代价高 |
-| 复盘草稿 | `claude-sonnet-5-5` | medium | 长文本生成，性价比 |
-| LLM-as-judge | `claude-opus-5-5` | medium | 评分模型不弱于被评模型 |
+| 环节                   | 模型                | effort | 理由                            |
+| ---------------------- | ------------------- | ------ | ------------------------------- |
+| 告警分诊（分类、去重） | `claude-haiku-5-5`  | low    | 高频、结构化输出、对延迟敏感    |
+| 根因调查（agent loop） | `claude-opus-5-5`   | high   | 多步推理 + 工具调用，错判代价高 |
+| 复盘草稿               | `claude-sonnet-5-5` | medium | 长文本生成，性价比              |
+| LLM-as-judge           | `claude-opus-5-5`   | medium | 评分模型不弱于被评模型          |
 
 A/B 实验里会对照「调查用 Sonnet 5.5 high」和「Opus 5.5 medium」，用评估数据决定最终配置。所有 Opus/Sonnet 调用开启服务端 `fallbacks: "default"`，并显式处理 `stop_reason: "refusal"`。Opus 5.5 无法关闭 thinking，默认 effort 是 medium，配置里必须显式设置。
 
@@ -127,11 +127,11 @@ A/B 实验里会对照「调查用 Sonnet 5.5 high」和「Opus 5.5 medium」，
 
 两类语料形态不同，检索策略也不同：runbook 按服务和告警名精确匹配，复盘报告按症状做语义相似。
 
-| 语料 | 来源 | 分块 | 元数据 | 主检索方式 |
-| --- | --- | --- | --- | --- |
-| Runbook | 自写 Markdown（每服务 1–3 篇） | 按 H2/H3 标题切，块内带标题路径 | service、alert\_name、更新时间 | 元数据过滤 + BM25 |
-| 内部复盘 | 自写 + 系统生成的复盘草稿 | 按「现象 / 根因 / 处置」语义段切 | 服务、故障类型、日期 | 向量 + BM25 混合 |
-| 公开复盘 | 公开的事故报告合集 | 同上，约 512 token，重叠 64 | 公司、故障类型 | 向量为主 |
+| 语料     | 来源                           | 分块                             | 元数据                         | 主检索方式        |
+| -------- | ------------------------------ | -------------------------------- | ------------------------------ | ----------------- |
+| Runbook  | 自写 Markdown（每服务 1–3 篇） | 按 H2/H3 标题切，块内带标题路径  | service、alert\_name、更新时间 | 元数据过滤 + BM25 |
+| 内部复盘 | 自写 + 系统生成的复盘草稿      | 按「现象 / 根因 / 处置」语义段切 | 服务、故障类型、日期           | 向量 + BM25 混合  |
+| 公开复盘 | 公开的事故报告合集             | 同上，约 512 token，重叠 64      | 公司、故障类型                 | 向量为主          |
 
 **管道步骤**
 
@@ -149,10 +149,10 @@ A/B 实验里会对照「调查用 Sonnet 5.5 high」和「Opus 5.5 medium」，
 
 读写工具拆成两个 MCP server，写操作在架构上就走不到未审批的路径，而不是靠提示词约束。
 
-| MCP server | 工具 | 凭证权限 | 调用方 |
-| --- | --- | --- | --- |
-| `mcp-observability` | `query_metrics`、`query_logs`、`get_trace`、`get_service_status`、`get_service_topology` | 只读 token（Prometheus/Loki/Tempo 只读，容器状态只读） | 调查 agent |
-| `mcp-ops` | `toggle_flag`、`restart_service`、`rollback_service` | 写权限，只接受带有效审批签名的请求 | API 层的审批执行器，**不挂到 agent 上** |
+| MCP server          | 工具                                                                                     | 凭证权限                                               | 调用方                                  |
+| ------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------- |
+| `mcp-observability` | `query_metrics`、`query_logs`、`get_trace`、`get_service_status`、`get_service_topology` | 只读 token（Prometheus/Loki/Tempo 只读，容器状态只读） | 调查 agent                              |
+| `mcp-ops`           | `toggle_flag`、`restart_service`、`rollback_service`                                     | 写权限，只接受带有效审批签名的请求                     | API 层的审批执行器，**不挂到 agent 上** |
 
 **关键决策**
 
@@ -183,13 +183,13 @@ A/B 实验里会对照「调查用 Sonnet 5.5 high」和「Opus 5.5 medium」，
 
 **指标与评分**
 
-| 层 | 指标 | 评分方式 | 门槛 |
-| --- | --- | --- | --- |
-| 检索 | recall@8、MRR | Vitest 确定性计算 | recall@8 ≥ 0.85 |
-| 端到端 | 根因 top-1 / top-3 命中 | LLM-as-judge（对照标准根因的评分标准） | top-3 ≥ 85% |
-| 端到端 | 证据引用是否真实存在 | 确定性校验（引用 ID 必须在工具结果里） | 100% |
-| 端到端 | 延迟、token、成本、工具调用次数 | 从 trace 读取 | 见 SLO |
-| 安全 | 注入是否改变结论、是否提议越权操作 | 确定性规则 + judge | 0 次 |
+| 层     | 指标                               | 评分方式                               | 门槛            |
+| ------ | ---------------------------------- | -------------------------------------- | --------------- |
+| 检索   | recall@8、MRR                      | Vitest 确定性计算                      | recall@8 ≥ 0.85 |
+| 端到端 | 根因 top-1 / top-3 命中            | LLM-as-judge（对照标准根因的评分标准） | top-3 ≥ 85%     |
+| 端到端 | 证据引用是否真实存在               | 确定性校验（引用 ID 必须在工具结果里） | 100%            |
+| 端到端 | 延迟、token、成本、工具调用次数    | 从 trace 读取                          | 见 SLO          |
+| 安全   | 注入是否改变结论、是否提议越权操作 | 确定性规则 + judge                     | 0 次            |
 
 LLM-as-judge 本身要校准：取 30 条人工打分的样本，judge 与人的一致率 ≥ 90% 才作数。
 
@@ -201,12 +201,12 @@ LLM-as-judge 本身要校准：取 30 条人工打分的样本，judge 与人的
 
 **预算**（每月上限 500 美元，按单次调查 ≤ 0.30 美元估算）
 
-| 用途 | 单次成本（估算） | 每月次数上限 | 小计 |
-| --- | --- | --- | --- |
-| 全量评估（约 60 条 + judge） | 约 25 美元 | 8 | 200 美元 |
-| PR 冒烟评估 | 约 3 美元 | 50 | 150 美元 |
-| 开发调试与手动调查 | — | — | 100 美元 |
-| 余量 | — | — | 50 美元 |
+| 用途                         | 单次成本（估算） | 每月次数上限 | 小计     |
+| ---------------------------- | ---------------- | ------------ | -------- |
+| 全量评估（约 60 条 + judge） | 约 25 美元       | 8            | 200 美元 |
+| PR 冒烟评估                  | 约 3 美元        | 50           | 150 美元 |
+| 开发调试与手动调查           | —                | —            | 100 美元 |
+| 余量                         | —                | —            | 50 美元  |
 
 评估脚本运行前先估算花费并检查当月已用额度，超过 80% 时只允许冒烟评估。全量评估可以走 Message Batches API，成本减半。
 
@@ -257,14 +257,14 @@ Effect 的 `Effect.withSpan` 和 `@effect/opentelemetry` 产生编排层 span；
 
 **失败模式与应对**
 
-| 失败模式 | 应对 |
-| --- | --- |
-| 幻觉：引用不存在的日志或指标 | 引用 ID 确定性校验，失败则报告标红并计入评估 |
-| 索引过期或损坏 | 索引版本化 + 重建后自动评估 + rerank 分数告警 |
-| Prompt injection | 不可信数据标记 + agent 无写权限 + 对抗评估 |
-| 模型拒答或不可用 | fallbacks + 退化为只给 runbook 检索结果 |
-| Agent 循环失控 | 最大轮数、task budget、单次成本上限 |
-| 对输出过度信任 | 报告强制列出证据和置信度，线上反馈追踪采纳率 |
+| 失败模式                     | 应对                                          |
+| ---------------------------- | --------------------------------------------- |
+| 幻觉：引用不存在的日志或指标 | 引用 ID 确定性校验，失败则报告标红并计入评估  |
+| 索引过期或损坏               | 索引版本化 + 重建后自动评估 + rerank 分数告警 |
+| Prompt injection             | 不可信数据标记 + agent 无写权限 + 对抗评估    |
+| 模型拒答或不可用             | fallbacks + 退化为只给 runbook 检索结果       |
+| Agent 循环失控               | 最大轮数、task budget、单次成本上限           |
+| 对输出过度信任               | 报告强制列出证据和置信度，线上反馈追踪采纳率  |
 
 **公平与透明**：在运维场景里偏见风险较低，重点放在透明度上：每条结论可追溯到证据，UI 标注「AI 生成」，模型和 prompt 版本对用户可见。
 
@@ -292,13 +292,13 @@ ccar-p-solution/
 
 **接口边界**（骨架阶段先定义，各包实现时不得擅自修改）
 
-| 提供方 | 接口 | 使用方 |
-| --- | --- | --- |
-| `rag` | `Retriever.search(query, filters) → Chunk[]`、`Ingestor.ingest(docs)` | api、evals |
-| `mcp-observability` | MCP 工具名 + 输入输出 Schema；`REPLAY_DIR` 环境变量 | api（agent）、evals |
-| `mcp-ops` | MCP 工具 + `ApprovalToken` Schema | api（审批执行器） |
-| `telemetry` | `TelemetryLive` Layer、`withGenAiSpan` 等辅助函数 | 所有后端包 |
-| `contracts` | `IncidentApi`（HttpApi 定义）、SSE 事件 Schema | api（实现）、web（`HttpApiClient` 派生客户端） |
+| 提供方              | 接口                                                                  | 使用方                                         |
+| ------------------- | --------------------------------------------------------------------- | ---------------------------------------------- |
+| `rag`               | `Retriever.search(query, filters) → Chunk[]`、`Ingestor.ingest(docs)` | api、evals                                     |
+| `mcp-observability` | MCP 工具名 + 输入输出 Schema；`REPLAY_DIR` 环境变量                   | api（agent）、evals                            |
+| `mcp-ops`           | MCP 工具 + `ApprovalToken` Schema                                     | api（审批执行器）                              |
+| `telemetry`         | `TelemetryLive` Layer、`withGenAiSpan` 等辅助函数                     | 所有后端包                                     |
+| `contracts`         | `IncidentApi`（HttpApi 定义）、SSE 事件 Schema                        | api（实现）、web（`HttpApiClient` 派生客户端） |
 
 接口先有可用的 stub 实现（例如返回固定数据的 `RetrieverStub` Layer），使用方不必等提供方完成。
 
@@ -328,31 +328,31 @@ ccar-p-solution/
 
 七个领域的每条目标都能在本项目里找到对应的实践，其中领域 6、领域 7 主要靠文档和工作流产出，而不是代码。
 
-| 领域（权重） | 考纲目标 | 本项目中的对应 | 章节 |
-| --- | --- | --- | --- |
-| 1 方案设计与架构（17%） | 业务问题转化、端到端架构、选择 workflow/agentic 模式、问题分解、业务价值 | MTTR 目标、分诊 workflow + 调查 agent、含反馈闭环的架构 | 背景与目标、总体架构 |
-| 2 模型、提示与上下文（13%） | 模型选择、系统提示与护栏、上下文与 token、缓存与 Skills | 三模型路由、缓存前缀设计、版本化 prompt、调查 Skill | 模型、提示与上下文工程 |
-| 3 集成（19%） | 工具能力膨胀、认证授权、精度与延迟取舍、可观测性、RAG 分块与检索、MCP vs API、渐进发现 | 读写拆分的 MCP、OIDC + OAuth、混合检索、tool search 对照 | RAG 管道、集成与安全、可观测性 |
-| 4 评估、测试与优化（16%） | 指标定义、数据集与混合方法、A/B、问题诊断、成本优化、监控 | 故障注入数据集、确定性 + judge、promptfoo A/B、成本看板 | 评估体系、可观测性 |
-| 5 治理、安全与风险（14%） | 护栏、失败模式、人工审批、合规、伦理 | 审批签名、PII 脱敏、审计表、注入防护、失败模式表 | 治理与风险 |
-| 6 干系人沟通与生命周期（14%） | 需求调研、决策沟通、SLA 对齐、架构文档、各生命周期阶段 | 本文档、SLO 表、ADR、交接文档、阶段性复盘 | 需求与 SLA、ADR 清单 |
-| 7 开发效率与运维赋能（7%） | 为团队配置 Claude Code、AI 辅助工作流、排障支持 | CLAUDE.md、hooks、项目 Skill、Codex review 流程、MCP 给 Claude Code 复用 | 仓库结构与开发效率 |
+| 领域（权重）                  | 考纲目标                                                                               | 本项目中的对应                                                           | 章节                           |
+| ----------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------ |
+| 1 方案设计与架构（17%）       | 业务问题转化、端到端架构、选择 workflow/agentic 模式、问题分解、业务价值               | MTTR 目标、分诊 workflow + 调查 agent、含反馈闭环的架构                  | 背景与目标、总体架构           |
+| 2 模型、提示与上下文（13%）   | 模型选择、系统提示与护栏、上下文与 token、缓存与 Skills                                | 三模型路由、缓存前缀设计、版本化 prompt、调查 Skill                      | 模型、提示与上下文工程         |
+| 3 集成（19%）                 | 工具能力膨胀、认证授权、精度与延迟取舍、可观测性、RAG 分块与检索、MCP vs API、渐进发现 | 读写拆分的 MCP、OIDC + OAuth、混合检索、tool search 对照                 | RAG 管道、集成与安全、可观测性 |
+| 4 评估、测试与优化（16%）     | 指标定义、数据集与混合方法、A/B、问题诊断、成本优化、监控                              | 故障注入数据集、确定性 + judge、promptfoo A/B、成本看板                  | 评估体系、可观测性             |
+| 5 治理、安全与风险（14%）     | 护栏、失败模式、人工审批、合规、伦理                                                   | 审批签名、PII 脱敏、审计表、注入防护、失败模式表                         | 治理与风险                     |
+| 6 干系人沟通与生命周期（14%） | 需求调研、决策沟通、SLA 对齐、架构文档、各生命周期阶段                                 | 本文档、SLO 表、ADR、交接文档、阶段性复盘                                | 需求与 SLA、ADR 清单           |
+| 7 开发效率与运维赋能（7%）    | 为团队配置 Claude Code、AI 辅助工作流、排障支持                                        | CLAUDE.md、hooks、项目 Skill、Codex review 流程、MCP 给 Claude Code 复用 | 仓库结构与开发效率             |
 
 ## ADR 清单与待决问题
 
 下列 ADR 在骨架阶段写入 `docs/adr/`，每篇包含背景、备选方案、决定和后果。
 
-| # | 决策 | 备选方案 |
-| --- | --- | --- |
-| 001 | 分诊用 workflow，调查用 agent | 全程 agent；全程固定 workflow |
-| 002 | 后端用 Effect 4，前端用 TanStack Start 1 | Fastify/Hono + 官方 SDK；Next.js |
+| #   | 决策                                                           | 备选方案                                   |
+| --- | -------------------------------------------------------------- | ------------------------------------------ |
+| 001 | 分诊用 workflow，调查用 agent                                  | 全程 agent；全程固定 workflow              |
+| 002 | 后端用 Effect 4，前端用 TanStack Start 1                       | Fastify/Hono + 官方 SDK；Next.js           |
 | 003 | Claude 接入只用官方 `@anthropic-ai/sdk`，封装成 Effect Service | `@effect/ai-anthropic` 为主、官方 SDK 备用 |
-| 004 | 工具通过 MCP 暴露，读写拆成两个 server，用官方 MCP SDK 实现 | 进程内函数调用；单个 MCP server |
-| 005 | Postgres + pgvector 混合检索 | 专用向量库（Qdrant 等）；纯向量 |
-| 006 | 三模型路由与 effort 配置 | 单一模型不同 effort |
-| 007 | 评估用录制快照回放而非实时遥测 | 每次实时注入故障 |
-| 008 | 观测后端用 Grafana 全家桶 | Langfuse |
-| 009 | 合规配置建议（数据驻留、保留期、ZDR） | — |
+| 004 | 工具通过 MCP 暴露，读写拆成两个 server，用官方 MCP SDK 实现    | 进程内函数调用；单个 MCP server            |
+| 005 | Postgres + pgvector 混合检索                                   | 专用向量库（Qdrant 等）；纯向量            |
+| 006 | 三模型路由与 effort 配置                                       | 单一模型不同 effort                        |
+| 007 | 评估用录制快照回放而非实时遥测                                 | 每次实时注入故障                           |
+| 008 | 观测后端用 Grafana 全家桶                                      | Langfuse                                   |
+| 009 | 合规配置建议（数据驻留、保留期、ZDR）                          | —                                          |
 
 **待决问题**
 

@@ -7,8 +7,9 @@ import { calibrate } from "./judge/calibration.ts"
 import { Judge } from "./judge/Judge.ts"
 import { Flagd } from "./record/Flagd.ts"
 import { ObservabilityMcp } from "./record/ObservabilityMcp.ts"
-import { recordBatch } from "./record/Recorder.ts"
-import { findScenario, Scenarios } from "./record/scenarios.ts"
+import { faultsOf, recordBatch } from "./record/Recorder.ts"
+import { Scenarios } from "./record/scenarios.ts"
+import { recordedScenarioNames, selectScenarios } from "./record/selection.ts"
 
 const repoRoot = new URL("../../../", import.meta.url).pathname
 
@@ -28,10 +29,19 @@ const scenarios = Command.make(
   "scenarios",
   {},
   Effect.fn(function* () {
-    for (const s of Scenarios)
-      yield* Console.log(`${s.name.padEnd(32)} ${s.flag}=${s.variant} → ${s.rootCause.service}`)
+    const done = recordedScenarioNames(yield* (yield* Datasets).cases)
+    for (const s of Scenarios) {
+      const flags = faultsOf(s)
+        .map((f) => `${f.flag}=${f.variant}`)
+        .join(" + ")
+      yield* Console.log(`${done.has(s.name) ? "✓" : " "} ${s.name.padEnd(48)} ${flags} → ${s.rootCause.service}`)
+    }
+    yield* Console.log(`${Scenarios.filter((s) => done.has(s.name)).length} of ${Scenarios.length} recorded (✓)`)
   }),
-).pipe(Command.withDescription("List the fault scenarios the recorder knows"))
+).pipe(
+  Command.withDescription("List the fault scenarios the recorder knows and which ones have a recorded case"),
+  Command.provide(Datasets.layerAt(packageRoot)),
+)
 
 const record = Command.make(
   "record",
@@ -41,6 +51,10 @@ const record = Command.make(
       Argument.withDescription("Scenario names, see `scenarios`"),
     ),
     all: Flag.Boolean("all").pipe(Flag.withDescription("Record every scenario"), Flag.withDefault(false)),
+    missing: Flag.Boolean("missing").pipe(
+      Flag.withDescription("Record every scenario that has no recorded case yet (resumes an interrupted --all)"),
+      Flag.withDefault(false),
+    ),
     flagdFile: Flag.String("flagd-file").pipe(
       Flag.withDescription("The OTel Demo flag file that flagd watches"),
       Flag.withDefault(`${repoRoot}infra/.otel-demo/src/flagd/demo.flagd.json`),
@@ -54,11 +68,19 @@ const record = Command.make(
       Flag.withDefault(10),
     ),
   },
-  Effect.fn(function* ({ names, all, flagdFile, mcp, cooldownMinutes }) {
-    const chosen = all ? Scenarios : names.map((n) => findScenario(n) ?? n)
-    const unknown = chosen.filter((s) => typeof s === "string")
+  Effect.fn(function* ({ names, all, missing, flagdFile, mcp, cooldownMinutes }) {
+    const cases = missing ? yield* (yield* Datasets).cases : []
+    const { chosen, unknown } = selectScenarios(Scenarios, cases, { names, all, missing })
     if (unknown.length > 0) return yield* Console.error(`unknown scenarios: ${unknown.join(", ")}`)
-    if (chosen.length === 0) return yield* Console.error("name at least one scenario, or pass --all")
+    if (chosen.length === 0) {
+      return yield* missing
+        ? Console.log("every scenario has a recorded case")
+        : Console.error("name at least one scenario, or pass --all or --missing")
+    }
+    // Per scenario: the cooldown, up to 10 minutes for the trigger, 2 minutes with the fault on.
+    yield* Console.log(
+      `${chosen.length} scenarios, at most ${(((cooldownMinutes + 12) * chosen.length) / 60).toFixed(1)} hours`,
+    )
 
     const [command = "node", ...args] = mcp.split(" ").filter((part) => part !== "")
     const env = Object.fromEntries(
@@ -66,17 +88,14 @@ const record = Command.make(
     )
     const layer = Layer.mergeAll(Flagd.layerFile(flagdFile), ObservabilityMcp.layerStdio(command, args, env))
 
-    const { recorded, failed } = yield* recordBatch(
-      chosen.filter((s) => typeof s !== "string"),
-      {
-        root: packageRoot,
-        triggerTimeout: Duration.minutes(10),
-        pollEvery: Duration.seconds(15),
-        afterTrigger: Duration.minutes(2),
-        lookback: Duration.minutes(15),
-        cooldown: Duration.minutes(cooldownMinutes),
-      },
-    ).pipe(Effect.provide(layer))
+    const { recorded, failed } = yield* recordBatch(chosen, {
+      root: packageRoot,
+      triggerTimeout: Duration.minutes(10),
+      pollEvery: Duration.seconds(15),
+      afterTrigger: Duration.minutes(2),
+      lookback: Duration.minutes(15),
+      cooldown: Duration.minutes(cooldownMinutes),
+    }).pipe(Effect.provide(layer))
     for (const r of recorded) yield* Console.log(`${r.scenario} → ${r.id} (${r.calls} calls)`)
     if (failed.length > 0) {
       yield* Console.error(`not recorded: ${failed.join(", ")}`)
@@ -85,7 +104,10 @@ const record = Command.make(
       })
     }
   }),
-).pipe(Command.withDescription("Inject faults into the local OTel Demo and record replay snapshots"))
+).pipe(
+  Command.withDescription("Inject faults into the local OTel Demo and record replay snapshots"),
+  Command.provide(Datasets.layerAt(packageRoot)),
+)
 
 const calibrateCommand = Command.make(
   "calibrate",

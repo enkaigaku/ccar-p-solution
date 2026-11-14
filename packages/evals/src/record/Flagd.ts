@@ -28,6 +28,19 @@ export const setVariant = (file: FlagdFile, flag: string, variant: string): Flag
   return { ...file, flags: { ...file.flags, [flag]: { ...current, defaultVariant: variant } } }
 }
 
+/** One flag set to one variant. A scenario injects one fault, or one fault plus unrelated distractors. */
+export interface Fault {
+  readonly flag: string
+  readonly variant: string
+}
+
+/** Applies every fault in turn; the first unknown flag or variant is the result. */
+export const setVariants = (file: FlagdFile, faults: ReadonlyArray<Fault>): FlagdFile | FlagdError =>
+  faults.reduce<FlagdFile | FlagdError>(
+    (acc, fault) => (acc instanceof FlagdError ? acc : setVariant(acc, fault.flag, fault.variant)),
+    file,
+  )
+
 /** Turns every flag that has an `off` variant off. */
 export const allOff = (file: FlagdFile): FlagdFile => ({
   ...file,
@@ -42,7 +55,10 @@ export const allOff = (file: FlagdFile): FlagdFile => ({
 export class Flagd extends Context.Service<
   Flagd,
   {
-    set(flag: string, variant: string): Effect.Effect<void, FlagdError>
+    /** Turns every fault off, then these on, in one write. */
+    set(faults: ReadonlyArray<Fault>): Effect.Effect<void, FlagdError>
+    /** Fails when the flag file lacks one of these flags or variants. Writes nothing. */
+    validate(faults: ReadonlyArray<Fault>): Effect.Effect<void, FlagdError>
     /** Turns every fault off. True when at least one flag was on, i.e. a fault was still being injected. */
     readonly reset: Effect.Effect<boolean, FlagdError>
   }
@@ -55,10 +71,14 @@ export class Flagd extends Context.Service<
         const codec = Schema.fromJsonString(FlagdFile)
         const wrap = (message: string) => (cause: unknown) => new FlagdError({ message, cause })
 
+        const read = Effect.gen(function* () {
+          const text = yield* fs.readFileString(path).pipe(Effect.mapError(wrap(`cannot read ${path}`)))
+          return yield* Schema.decodeUnknownEffect(codec)(text).pipe(Effect.mapError(wrap("bad flagd file")))
+        })
+
         const update = (f: (file: FlagdFile) => FlagdFile | FlagdError) =>
           Effect.gen(function* () {
-            const text = yield* fs.readFileString(path).pipe(Effect.mapError(wrap(`cannot read ${path}`)))
-            const file = yield* Schema.decodeUnknownEffect(codec)(text).pipe(Effect.mapError(wrap("bad flagd file")))
+            const file = yield* read
             const next = f(file)
             if (next instanceof FlagdError) return yield* next
             const changed = Object.entries(next.flags).some(
@@ -72,7 +92,12 @@ export class Flagd extends Context.Service<
           })
 
         return Flagd.of({
-          set: (flag, variant) => update((file) => setVariant(allOff(file), flag, variant)).pipe(Effect.asVoid),
+          set: (faults) => update((file) => setVariants(allOff(file), faults)).pipe(Effect.asVoid),
+          validate: (faults) =>
+            Effect.flatMap(read, (file) => {
+              const next = setVariants(file, faults)
+              return next instanceof FlagdError ? Effect.fail(next) : Effect.void
+            }),
           reset: update(allOff),
         })
       }),
