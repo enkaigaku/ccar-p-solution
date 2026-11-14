@@ -2,8 +2,18 @@ import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
 import { ReplaySnapshot } from "@incident/contracts"
 import { Context, DateTime, Duration, Effect, FileSystem, Layer, Path, Ref, Schema } from "effect"
+import { HttpClient, HttpClientResponse } from "effect/http"
 import { AdversarialCase, FaultCase } from "../src/dataset/EvalCase.ts"
-import { allOff, Flagd, FlagdError, FlagdFile, setVariant, setVariants } from "../src/record/Flagd.ts"
+import {
+  allOff,
+  Flagd,
+  FlagdError,
+  FlagdFile,
+  servedMismatches,
+  servedVariantsFrom,
+  setVariant,
+  setVariants,
+} from "../src/record/Flagd.ts"
 import { McpCallError, ObservabilityMcp } from "../src/record/ObservabilityMcp.ts"
 import { faultsOf, opaqueId, recordBatch, recordScenario } from "../src/record/Recorder.ts"
 import { DistractorPairs, findScenario, Scenarios } from "../src/record/scenarios.ts"
@@ -93,6 +103,186 @@ describe("flagd file", () => {
         assert.strictEqual(JSON.parse(yield* fs.readFileString(path)).flags.paymentFailure.defaultVariant, "50%")
       }).pipe(Effect.provide(Flagd.layerFile(path)))
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  )
+})
+
+describe("flagd follows the file", () => {
+  const file = Schema.decodeUnknownSync(FlagdFile)(flagdJson)
+  const on = [{ flag: "paymentFailure", variant: "50%" }]
+
+  const withFlagFile = <A, E>(
+    use: (path: string, read: Effect.Effect<Record<string, string>>) => Effect.Effect<A, E, FileSystem.FileSystem>,
+  ) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = `${yield* fs.makeTempDirectoryScoped()}/demo.flagd.json`
+      yield* fs.writeFileString(path, JSON.stringify(flagdJson))
+      // What a healthy flagd serves: the file's current variants.
+      const read = Effect.orDie(fs.readFileString(path)).pipe(
+        Effect.map((text) => {
+          const flags = Schema.decodeUnknownSync(Schema.fromJsonString(FlagdFile))(text).flags
+          return Object.fromEntries(Object.entries(flags).map(([name, f]) => [name, f.defaultVariant]))
+        }),
+      )
+      return yield* use(path, read)
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+
+  it("lists the flags flagd serves differently from the file", () => {
+    assert.deepStrictEqual(servedMismatches(file, { paymentFailure: "off", adHighCpu: "on" }), [])
+    assert.deepStrictEqual(servedMismatches(file, { paymentFailure: "off" }), [
+      "adHighCpu: file says on, flagd serves nothing",
+    ])
+    assert.deepStrictEqual(servedMismatches(file, { paymentFailure: "50%", adHighCpu: "on" }), [
+      "paymentFailure: file says off, flagd serves 50%",
+    ])
+  })
+
+  it.live("writes in place, without replacing the file flagd watches", () =>
+    withFlagFile((path) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        const before = yield* fs.stat(path)
+        yield* Effect.gen(function* () {
+          yield* (yield* Flagd).set(on)
+        }).pipe(Effect.provide(Flagd.layerFile(path)))
+        const after = yield* fs.stat(path)
+        assert.deepStrictEqual(after.ino, before.ino)
+        assert.isFalse(yield* fs.exists(`${path}.tmp`))
+      }),
+    ),
+  )
+
+  it.live("passes when flagd serves what was written", () =>
+    withFlagFile((path, read) =>
+      Effect.gen(function* () {
+        const flagd = yield* Flagd
+        yield* flagd.set(on)
+        assert.isTrue(yield* flagd.reset)
+      }).pipe(Effect.provide(Flagd.layerFile(path, { served: read, settle: Duration.millis(200) }))),
+    ),
+  )
+
+  it.live("fails the injection when flagd stopped following the file", () =>
+    withFlagFile((path) =>
+      Effect.gen(function* () {
+        // A flagd whose watcher died keeps serving the state from before.
+        const stale = Effect.succeed({ paymentFailure: "off", adHighCpu: "on" })
+        const error = yield* Effect.flip(
+          Effect.gen(function* () {
+            yield* (yield* Flagd).set(on)
+          }).pipe(Effect.provide(Flagd.layerFile(path, { served: stale, settle: Duration.millis(60) }))),
+        )
+        assert.strictEqual(error._tag, "FlagdError")
+        assert.include(error.message, "paymentFailure: file says 50%, flagd serves off")
+        assert.include(error.message, "Restart flagd")
+      }),
+    ),
+  )
+
+  it.live("writes a second time when flagd missed the first write", () =>
+    withFlagFile((path, read) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        // flagd only picks up a change on the second write event.
+        const writes = yield* Ref.make(0)
+        const seen = yield* Ref.make<Record<string, string>>({ paymentFailure: "off", adHighCpu: "on" })
+        const countingFs = FileSystem.FileSystem.of({
+          ...fs,
+          writeFileString: (file, data, options) =>
+            fs.writeFileString(file, data, options).pipe(
+              Effect.tap(() =>
+                Effect.flatMap(
+                  Ref.updateAndGet(writes, (n) => n + 1),
+                  (n) => (n >= 2 ? Effect.flatMap(read, (now) => Ref.set(seen, now)) : Effect.void),
+                ),
+              ),
+            ),
+        })
+        yield* Effect.gen(function* () {
+          yield* (yield* Flagd).set(on)
+        }).pipe(
+          Effect.provide(Flagd.layerFile(path, { served: Ref.get(seen), settle: Duration.millis(60) })),
+          Effect.provideService(FileSystem.FileSystem, countingFs),
+        )
+        assert.strictEqual(yield* Ref.get(writes), 2)
+        assert.strictEqual((yield* Ref.get(seen)).paymentFailure, "50%")
+      }),
+    ),
+  )
+
+  it.live("keeps the HTTP client alive for every check, not only while the layer is built", () =>
+    withFlagFile((path, read) =>
+      Effect.gen(function* () {
+        // Like the undici client: it stops working once the scope it was built in closes.
+        const alive = yield* Ref.make(false)
+        const calls = yield* Ref.make(0)
+        const scopedClient = Layer.effect(
+          HttpClient.HttpClient,
+          Effect.as(
+            Effect.acquireRelease(Ref.set(alive, true), () => Ref.set(alive, false)),
+            HttpClient.make((request) =>
+              Effect.gen(function* () {
+                if (!(yield* Ref.get(alive))) return yield* Effect.die("The client is destroyed")
+                yield* Ref.update(calls, (n) => n + 1)
+                const flags = Object.fromEntries(Object.entries(yield* read).map(([name, v]) => [name, { variant: v }]))
+                return HttpClientResponse.fromWeb(request, new Response(JSON.stringify({ flags }), { status: 200 }))
+              }),
+            ),
+          ),
+        )
+        yield* Effect.gen(function* () {
+          const flagd = yield* Flagd
+          yield* flagd.set(on)
+          assert.isTrue(yield* flagd.reset)
+        }).pipe(
+          Effect.provide(
+            Flagd.layerVerified(path, "http://flagd.test", Duration.millis(200)).pipe(Layer.provide(scopedClient)),
+          ),
+        )
+        assert.isAtLeast(yield* Ref.get(calls), 2)
+        assert.isFalse(yield* Ref.get(alive))
+      }),
+    ),
+  )
+
+  it.effect("asks flagd's evaluation API for every flag's variant", () =>
+    Effect.gen(function* () {
+      const urls = yield* Ref.make<Array<string>>([])
+      const client = HttpClient.make((request, url) =>
+        Effect.as(
+          Ref.update(urls, (all) => [...all, `${request.method} ${url.toString()}`]),
+          HttpClientResponse.fromWeb(
+            request,
+            new Response(
+              JSON.stringify({
+                flags: {
+                  adHighCpu: { reason: "STATIC", variant: "on", boolValue: true, metadata: {} },
+                  paymentFailure: { reason: "STATIC", variant: "50%", doubleValue: 0.5 },
+                },
+              }),
+              { status: 200, headers: { "content-type": "application/json" } },
+            ),
+          ),
+        ),
+      )
+      const served = yield* servedVariantsFrom("http://localhost:32893/").pipe(
+        Effect.provideService(HttpClient.HttpClient, client),
+      )
+      assert.deepStrictEqual(yield* served, { adHighCpu: "on", paymentFailure: "50%" })
+      assert.deepStrictEqual(yield* Ref.get(urls), [
+        "POST http://localhost:32893/flagd.evaluation.v1.Service/ResolveAll",
+      ])
+
+      const down = HttpClient.make((request) =>
+        Effect.succeed(HttpClientResponse.fromWeb(request, new Response("nope", { status: 502 }))),
+      )
+      const error = yield* Effect.flip(
+        Effect.flatten(
+          servedVariantsFrom("http://localhost:1").pipe(Effect.provideService(HttpClient.HttpClient, down)),
+        ),
+      )
+      assert.strictEqual(error._tag, "FlagdError")
+    }),
   )
 })
 

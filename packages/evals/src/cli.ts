@@ -1,5 +1,5 @@
-import { NodeRuntime, NodeServices } from "@effect/platform-node"
-import { Console, DateTime, Duration, Effect, Layer } from "effect"
+import { NodeHttpClient, NodeRuntime, NodeServices } from "@effect/platform-node"
+import { Console, DateTime, Duration, Effect, Layer, Option } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
 import { BudgetGuard, BudgetPolicy } from "./budget/Budget.ts"
 import { Datasets, packageRoot } from "./dataset/Datasets.ts"
@@ -63,12 +63,19 @@ const record = Command.make(
       Flag.withDescription("Command that starts mcp-observability over stdio (live mode, REPLAY_DIR unset)"),
       Flag.withDefault(`node ${repoRoot}packages/mcp-observability/src/main.ts`),
     ),
+    flagdUrl: Flag.String("flagd-url").pipe(
+      Flag.withDescription(
+        "flagd's evaluation API, e.g. http://localhost:$(docker port flagd 8013/tcp | cut -d: -f2). " +
+          "When given, every injection is checked against what flagd serves",
+      ),
+      Flag.optional,
+    ),
     cooldownMinutes: Flag.Int("cooldown-minutes").pipe(
       Flag.withDescription("Wait between scenarios so the previous fault drains out of the window"),
       Flag.withDefault(10),
     ),
   },
-  Effect.fn(function* ({ names, all, missing, flagdFile, mcp, cooldownMinutes }) {
+  Effect.fn(function* ({ names, all, missing, flagdFile, flagdUrl, mcp, cooldownMinutes }) {
     const cases = missing ? yield* (yield* Datasets).cases : []
     const { chosen, unknown } = selectScenarios(Scenarios, cases, { names, all, missing })
     if (unknown.length > 0) return yield* Console.error(`unknown scenarios: ${unknown.join(", ")}`)
@@ -86,7 +93,15 @@ const record = Command.make(
     const env = Object.fromEntries(
       Object.entries(process.env).filter((e): e is [string, string] => e[1] !== undefined && e[0] !== "REPLAY_DIR"),
     )
-    const layer = Layer.mergeAll(Flagd.layerFile(flagdFile), ObservabilityMcp.layerStdio(command, args, env))
+    if (Option.isNone(flagdUrl)) {
+      yield* Console.error(
+        "no --flagd-url: injections are not checked against flagd, a dead file watcher goes unnoticed",
+      )
+    }
+    const flagd = Option.isSome(flagdUrl)
+      ? Flagd.layerVerified(flagdFile, flagdUrl.value).pipe(Layer.provide(NodeHttpClient.layerUndici))
+      : Flagd.layerFile(flagdFile)
+    const layer = Layer.mergeAll(flagd, ObservabilityMcp.layerStdio(command, args, env))
 
     const { recorded, failed } = yield* recordBatch(chosen, {
       root: packageRoot,
