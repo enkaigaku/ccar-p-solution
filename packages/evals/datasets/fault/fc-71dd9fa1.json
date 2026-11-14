@@ -2,7 +2,7 @@
   "kind": "fault",
   "id": "fc-71dd9fa1",
   "snapshotId": "fc-71dd9fa1",
-  "smoke": false,
+  "smoke": true,
   "groundTruth": {
     "rootCause": "The shipping service's ship-order calls are delayed by 10sec (international shipping slowdown), so placing an order is slow.",
     "service": "shipping",

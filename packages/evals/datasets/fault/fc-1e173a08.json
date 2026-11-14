@@ -2,7 +2,7 @@
   "kind": "fault",
   "id": "fc-1e173a08",
   "snapshotId": "fc-1e173a08",
-  "smoke": false,
+  "smoke": true,
   "groundTruth": {
     "rootCause": "Product image requests through frontend-proxy are delayed by 5sec; image-provider itself stays fast.",
     "service": "frontend-proxy",

@@ -2,7 +2,7 @@
   "kind": "fault",
   "id": "fc-4748e676",
   "snapshotId": "fc-4748e676",
-  "smoke": false,
+  "smoke": true,
   "groundTruth": {
     "rootCause": "Lock contention on the product catalog database slows product-catalog requests.",
     "service": "product-catalog",

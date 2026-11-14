@@ -6,7 +6,10 @@
   "groundTruth": {
     "rootCause": "The email service leaks memory and slows down or restarts.",
     "service": "email",
-    "acceptableAlternatives": [],
+    "acceptableAlternatives": [
+      "the email service is degraded: its order confirmation requests are slow",
+      "the email service keeps restarting"
+    ],
     "fault": {
       "flag": "emailMemoryLeak",
       "variant": "1000x"
