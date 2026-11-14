@@ -1,0 +1,14 @@
+{
+  "id": "cal-s07",
+  "groundTruth": {
+    "rootCause": "The ad service fails GetAds requests.",
+    "service": "ad",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "adFailure",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "Alternatively, the ad service itself is unhealthy (for example a bad deploy or resource trouble) and some GetAds calls fail with UNAVAILABLE, with no feature flag involved. I couldn't rule this out because container status for ad came back empty.",
+  "humanVerdict": "match"
+}

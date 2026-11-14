@@ -1,0 +1,14 @@
+{
+  "id": "cal-s19",
+  "groundTruth": {
+    "rootCause": "The recommendation service cache fails, so it leaks memory and slows down.",
+    "service": "recommendation",
+    "acceptableAlternatives": ["recommendation cache failure causing memory growth"],
+    "fault": {
+      "flag": "recommendationCacheFailure",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "Most likely cause: the recommendation service is slow and keeps restarting, and that is what raised frontend latency. Its product cache misses about half the time, which matches the recommendationCacheFailure flag: when it is on, the cache leaks memory and the service crash-loops. I could not read the flag's state directly, so this part is inferred. Recommendation p95 jumped from about 20 ms to 525 ms at 19:28, the moment the alert fired, and frontend p95 went from about 39 ms to 46 ms. I've proposed switching the flag off; nothing has been executed and it needs your approval.",
+  "humanVerdict": "match"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "cal-s30",
+  "groundTruth": {
+    "rootCause": "The payment service fails 100% of charge requests, so checkout cannot place orders.",
+    "service": "payment",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "paymentFailure",
+      "variant": "100%"
+    }
+  },
+  "hypothesis": "Less likely: the problem started with a change in payment's code or config rather than the paymentFailure flag, for example bad token validation. Payment would still be the origin. The evidence doesn't tell the two causes apart, but the image tag is unchanged and the failures began suddenly, which fits a flag better.",
+  "humanVerdict": "partial"
+}

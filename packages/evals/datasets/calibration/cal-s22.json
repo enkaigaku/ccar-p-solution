@@ -1,0 +1,14 @@
+{
+  "id": "cal-s22",
+  "groundTruth": {
+    "rootCause": "The recommendation service cache fails, so it leaks memory and slows down.",
+    "service": "recommendation",
+    "acceptableAlternatives": ["recommendation cache failure causing memory growth"],
+    "fault": {
+      "flag": "recommendationCacheFailure",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "The recommendation service is the root cause. Its container keeps restarting (10 restarts). After each restart, its calls are slow or fail, which pushes up frontend p95 latency. The runbook pattern is memory growth followed by an OOM kill, possibly from the recommendationCacheFailure flag. But product-catalog traffic did not jump about 10x as that pattern predicts, so I can't confirm the mechanism.",
+  "humanVerdict": "match"
+}

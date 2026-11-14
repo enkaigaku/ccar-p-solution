@@ -1,0 +1,14 @@
+{
+  "id": "cal-s08",
+  "groundTruth": {
+    "rootCause": "The cart service fails 25% of EmptyCart requests, so checkout's PlaceOrder calls fail.",
+    "service": "cart",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "cartFailure",
+      "variant": "25%"
+    }
+  },
+  "hypothesis": "cart failed to reach its Redis/Valkey store (valkey-cart) once, at 17:13:39, during an EmptyCart call made by checkout's PlaceOrder. The error came back to checkout as a failed order, which raised its error rate. This was a transient partial failure: about 1 failed EmptyCart out of 18, not an outage. valkey-cart is running with 0 restarts and later EmptyCart calls succeeded.",
+  "humanVerdict": "partial"
+}

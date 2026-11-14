@@ -1,0 +1,14 @@
+{
+  "id": "cal-s13",
+  "groundTruth": {
+    "rootCause": "The ad service is CPU-saturated: something inside it burns CPU while request traffic is unchanged.",
+    "service": "ad",
+    "acceptableAlternatives": ["high CPU load in the ad service"],
+    "fault": {
+      "flag": "adHighCpu",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "The ad service's built-in High CPU-Load fault path is turned on, most likely by flagd's adHighCpu fault-injection flag (inferred, since the flag state wasn't read directly). The extra CPU work runs on each ad request, so the service uses more CPU and gets slower even though traffic hasn't changed. I've proposed setting adHighCpu to off; nothing has been changed until someone approves it.",
+  "humanVerdict": "match"
+}

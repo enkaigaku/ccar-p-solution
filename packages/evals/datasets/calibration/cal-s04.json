@@ -1,0 +1,14 @@
+{
+  "id": "cal-s04",
+  "groundTruth": {
+    "rootCause": "The ad service fails GetAds requests.",
+    "service": "ad",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "adFailure",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "The recommendation service may be adding to the frontend errors. It showed a brief small error bump (up to about 0.009/s) around 14:19-14:20, but it logged no errors and is back to 0. It is probably minor or a side effect, not the main cause.",
+  "humanVerdict": "miss"
+}

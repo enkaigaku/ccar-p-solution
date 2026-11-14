@@ -1,0 +1,14 @@
+{
+  "id": "cal-s01",
+  "groundTruth": {
+    "rootCause": "The ad service is CPU-saturated: something inside it burns CPU while request traffic is unchanged.",
+    "service": "ad",
+    "acceptableAlternatives": ["high CPU load in the ad service"],
+    "fault": {
+      "flag": "adHighCpu",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "The adHighCpu feature flag is on, which runs a CPU-burning busy loop on every ad request. Each GetAds request now costs more CPU (p95 went from about 1.9 ms to 4.4 ms) while request rate stayed roughly flat. The ad service causes the HighCpu alert itself; no upstream service is driving it. I could not read ad CPU directly (the JVM CPU query isn't supported) and did not read flagd's state, so the flag is inferred from the log message and the runbook. I have proposed turning adHighCpu off for human approval; nothing has been executed.",
+  "humanVerdict": "match"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "cal-s14",
+  "groundTruth": {
+    "rootCause": "The payment service fails 10% of charge requests, so checkout cannot place orders.",
+    "service": "payment",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "paymentFailure",
+      "variant": "10%"
+    }
+  },
+  "hypothesis": "The checkout errors start in the payment service. Some of payment's Charge calls are rejected with 'Payment request failed. Invalid token.', in at least one case for a gold-loyalty user, and checkout passes those failures on. This is a partial failure, not an outage: about 1 failed checkout per minute out of roughly 0.45–0.8 requests per second (about 2–3%), and payment logged 25 successful transactions in the same window. In the OpenTelemetry Demo, this error matches the paymentFailure feature flag being on at a low percentage, but I haven't confirmed the flag state from flagd.",
+  "humanVerdict": "match"
+}

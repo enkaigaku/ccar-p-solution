@@ -1,0 +1,14 @@
+{
+  "id": "cal-s28",
+  "groundTruth": {
+    "rootCause": "Lock contention on the product catalog database slows product-catalog requests.",
+    "service": "product-catalog",
+    "acceptableAlternatives": ["product-catalog database lock contention"],
+    "fault": {
+      "flag": "productCatalogLockContention",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "Less likely: recommendation is slow on its own account. Its p95 reached 15 s about a minute before product-catalog's did. But it calls product-catalog and nothing in its logs points to its own fault, so it is most likely just inheriting product-catalog's delay.",
+  "humanVerdict": "miss"
+}

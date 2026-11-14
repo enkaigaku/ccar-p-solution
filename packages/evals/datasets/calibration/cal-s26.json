@@ -1,0 +1,14 @@
+{
+  "id": "cal-s26",
+  "groundTruth": {
+    "rootCause": "The ad service fails GetAds requests.",
+    "service": "ad",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "adFailure",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "The errors start in the ad service: from about 07:57–07:58 its GetAds RPC fails with gRPC UNAVAILABLE on a small share of calls (about 4% of ad requests), and the frontend passes these on as 'API request failed' errors. This fits the adFailure feature flag being switched on (runbook: the flag makes GetAds fail on a share of requests), but I couldn't read the flag state in flagd to confirm it. This is a partial failure, not an outage: ad traffic is normal, checkout and cart show no errors, and orders still go through. Ads are optional, so users mostly just lose the ad banner. I've proposed turning adFailure off; a human has to approve it.",
+  "humanVerdict": "match"
+}

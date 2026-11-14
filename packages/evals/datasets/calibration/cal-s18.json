@@ -1,0 +1,17 @@
+{
+  "id": "cal-s18",
+  "groundTruth": {
+    "rootCause": "Product image requests through frontend-proxy are delayed by 5sec; image-provider itself stays fast.",
+    "service": "frontend-proxy",
+    "acceptableAlternatives": [
+      "slow loading of product images",
+      "image requests are delayed before they reach image-provider"
+    ],
+    "fault": {
+      "flag": "imageSlowLoad",
+      "variant": "5sec"
+    }
+  },
+  "hypothesis": "The most likely cause is a delay added inside frontend-proxy (Envoy) itself, not in any downstream service. Starting at 10:25 its p95 latency jumped from about 35 ms to 3.2–4.1 s, while frontend, flagd and image-provider latency stayed flat. In this demo that pattern matches the imageSlowLoad flag, which makes Envoy fault-inject a delay on image requests before they reach image-provider. I could not confirm the flag is on: the log search did not filter by path and there were no slow traces to fetch. Treat the flag as the leading suspect.",
+  "humanVerdict": "match"
+}

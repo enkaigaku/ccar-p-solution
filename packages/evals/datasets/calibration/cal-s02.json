@@ -1,0 +1,17 @@
+{
+  "id": "cal-s02",
+  "groundTruth": {
+    "rootCause": "The email service leaks memory and slows down or restarts.",
+    "service": "email",
+    "acceptableAlternatives": [
+      "the email service is degraded: its order confirmation requests are slow",
+      "the email service keeps restarting"
+    ],
+    "fault": {
+      "flag": "emailMemoryLeak",
+      "variant": "1000x"
+    }
+  },
+  "hypothesis": "The extra latency could be load-related: email's request rate rose from about 0.03-0.1 to about 0.17 req/s around 05:50. This is unlikely to be the main cause, because the absolute volume is tiny and checkout's p95 did not rise (62-82 ms).",
+  "humanVerdict": "partial"
+}

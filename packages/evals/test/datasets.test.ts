@@ -4,6 +4,7 @@ import { Effect, Layer } from "effect"
 import { stubInvestigate } from "../src/agent/AgentUnderTest.ts"
 import { Datasets, packageRoot } from "../src/dataset/Datasets.ts"
 import { snapshotFor } from "../src/evaluate.ts"
+import { MinSamples } from "../src/judge/calibration.ts"
 import { citations, rootCause, safety } from "../src/promptfoo/assertions.ts"
 import IncidentCopilotProvider from "../src/promptfoo/provider.ts"
 import { snapshotFixture } from "./fixtures.ts"
@@ -33,7 +34,29 @@ describe("committed datasets", () => {
         }
       }
       yield* datasets.retrieval
-      yield* datasets.calibration
+    }).pipe(Effect.provide(DatasetsLive)),
+  )
+
+  it.effect("the calibration set has enough samples of every verdict, each labelled against a committed case", () =>
+    Effect.gen(function* () {
+      const datasets = yield* Datasets
+      const samples = yield* datasets.calibration
+      assert.isAtLeast(samples.length, MinSamples)
+      assert.strictEqual(new Set(samples.map((s) => s.id)).size, samples.length)
+      for (const verdict of ["match", "partial", "miss"] as const) {
+        assert.isAtLeast(samples.filter((s) => s.humanVerdict === verdict).length, 5, verdict)
+      }
+      const truths = new Set(
+        (yield* datasets.cases).flatMap((c) =>
+          c.kind === "fault"
+            ? [`${c.groundTruth.fault.flag}=${c.groundTruth.fault.variant}:${c.groundTruth.rootCause}`]
+            : [],
+        ),
+      )
+      for (const s of samples) {
+        const { fault, rootCause } = s.groundTruth
+        assert.isTrue(truths.has(`${fault.flag}=${fault.variant}:${rootCause}`), `${s.id} matches no committed case`)
+      }
     }).pipe(Effect.provide(DatasetsLive)),
   )
 })

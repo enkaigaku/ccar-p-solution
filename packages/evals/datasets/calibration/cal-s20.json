@@ -1,0 +1,14 @@
+{
+  "id": "cal-s20",
+  "groundTruth": {
+    "rootCause": "Full manual garbage collections in the ad service pause it and raise latency.",
+    "service": "ad",
+    "acceptableAlternatives": ["GC pauses in the ad service"],
+    "fault": {
+      "flag": "adManualGc",
+      "variant": "on"
+    }
+  },
+  "hypothesis": "Less likely: checkout is adding some of the frontend latency. Its p95 rose from about 40–68 ms to 91 ms. The rise is small and noisy, so it is probably a side effect or normal variation rather than a separate cause.",
+  "humanVerdict": "miss"
+}
