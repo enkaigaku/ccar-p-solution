@@ -21,7 +21,16 @@ describe("committed datasets", () => {
         const snapshot = yield* snapshotFor(c)
         if (c.kind === "fault") assert.strictEqual(snapshot.caseId, c.id, `${c.id} snapshot caseId`)
         // The answer must never be readable from what replay serves.
-        if (c.kind === "fault") assert.notInclude(JSON.stringify(snapshot.calls), c.groundTruth.fault.flag)
+        if (c.kind === "fault" && !c.synthetic) {
+          // Checked on the outputs: a scenario's own trigger query is an input and may name what it measures.
+          const served = JSON.stringify(snapshot.calls.map((call) => call.output))
+          for (const flag of [c.groundTruth.fault.flag, ...(c.groundTruth.distractors ?? []).map((d) => d.flag)]) {
+            assert.notInclude(served, flag, `${c.id} serves the flag name ${flag}`)
+          }
+          assert.notMatch(served, /feature ?flag/i, `${c.id} serves a feature flag log line`)
+        } else if (c.kind === "fault") {
+          assert.notInclude(JSON.stringify(snapshot.calls), c.groundTruth.fault.flag)
+        }
       }
       yield* datasets.retrieval
       yield* datasets.calibration

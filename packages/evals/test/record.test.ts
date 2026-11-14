@@ -1,6 +1,6 @@
 import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
-import { ReplaySnapshot } from "@incident/contracts"
+import { type RecordedToolCall, ReplaySnapshot } from "@incident/contracts"
 import { Context, DateTime, Duration, Effect, FileSystem, Layer, Path, Ref, Schema } from "effect"
 import { HttpClient, HttpClientResponse } from "effect/http"
 import { AdversarialCase, FaultCase } from "../src/dataset/EvalCase.ts"
@@ -17,6 +17,7 @@ import {
 import { McpCallError, ObservabilityMcp } from "../src/record/ObservabilityMcp.ts"
 import { faultsOf, opaqueId, recordBatch, recordScenario } from "../src/record/Recorder.ts"
 import { DistractorPairs, findScenario, Scenarios } from "../src/record/scenarios.ts"
+import { isInjectionMarker, scrubCall } from "../src/record/scrub.ts"
 import { recordedScenarioNames, selectScenarios } from "../src/record/selection.ts"
 import { OtelDemoFlags } from "./otelDemoFlags.ts"
 
@@ -375,6 +376,7 @@ const fakeMcp = (calls: Ref.Ref<Array<string>>) =>
                 topMessages: [],
                 samples: [
                   { ref: "s", timestamp: "t", line: "charge failed trace_id=0123456789abcdef0123456789abcdef" },
+                  { ref: "s2", timestamp: "t", line: "Feature Flag paymentFailure enabled, failing the charge" },
                 ],
               }
             case "get_trace":
@@ -382,7 +384,14 @@ const fakeMcp = (calls: Ref.Ref<Array<string>>) =>
             case "get_service_status":
               return { ref: "st", services: [] }
             case "get_service_topology":
-              return { ref: "topo", edges: [{ from: "checkout", to: "payment", protocol: "grpc" }] }
+              return {
+                ref: "topo",
+                edges: [
+                  { from: "checkout", to: "payment", protocol: "grpc" },
+                  { from: "checkout", to: "flagd", protocol: "grpc" },
+                  { from: "user", to: "checkout", protocol: "http" },
+                ],
+              }
           }
         }) as never,
     }),
@@ -416,6 +425,12 @@ describe("recorder", () => {
       assert.strictEqual(snapshot.alert.labels.service, "checkout")
       assert.isTrue(snapshot.calls.some((c) => c.tool === "get_trace"))
       assert.isTrue(snapshot.calls.some((c) => c.tool === "query_logs" && c.input.service === "payment"))
+      // No time is spent on flagd or on the service graph's placeholder for callers without telemetry.
+      assert.isFalse(snapshot.calls.some((c) => c.tool === "query_logs" && ["flagd", "user"].includes(c.input.service)))
+      // The demo's own "feature flag enabled" log line is not recorded; the real failure line is.
+      const lines = snapshot.calls.flatMap((c) => (c.tool === "query_logs" ? c.output.samples.map((s) => s.line) : []))
+      assert.isTrue(lines.some((line) => line.startsWith("charge failed")))
+      assert.isFalse(lines.some((line) => line.includes("Feature Flag")))
       // Error, warn and unfiltered logs per service.
       assert.deepStrictEqual(
         snapshot.calls.flatMap((c) =>
@@ -698,6 +713,75 @@ describe("recorder", () => {
       assert.deepStrictEqual(yield* Ref.get(seen), [])
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   )
+})
+
+describe("fault-injection log lines", () => {
+  const logs = (
+    topMessages: ReadonlyArray<{ pattern: string; count: number }>,
+    lines: ReadonlyArray<string>,
+    countsByLevel: Record<string, number>,
+  ): RecordedToolCall => ({
+    tool: "query_logs",
+    input: { service: "ad", start: "s", end: "e", limit: 20 },
+    output: {
+      ref: "logs:ad",
+      totalMatched: Object.values(countsByLevel).reduce((a, b) => a + b, 0),
+      countsByLevel,
+      topMessages,
+      samples: lines.map((line, i) => ({ ref: `logs:ad#${i}`, timestamp: "t", line })),
+    },
+  })
+
+  it("recognises lines that name a flag or a feature flag, and nothing else", () => {
+    assert.isTrue(isInjectionMarker("Feature Flag adManualGc enabled, performing a manual gc now"))
+    assert.isTrue(isInjectionMarker("Delaying international shipment due to intlShippingSlowdown feature flag"))
+    assert.isTrue(isInjectionMarker("PAYMENTFAILURE is on"))
+    assert.isFalse(isInjectionMarker("Triggering a manual garbage collection, next one in 10 seconds."))
+    assert.isFalse(isInjectionMarker("POST /flagservice/flagd.evaluation.v1.Service/ResolveAll 200"))
+    assert.isFalse(isInjectionMarker("payment failed: card declined"))
+  })
+
+  it("removes them from messages, samples and counts, and leaves the rest as it was", () => {
+    const call = logs(
+      [
+        { pattern: "Feature Flag adManualGc enabled, performing a manual gc now", count: 27 },
+        { pattern: "Triggering a manual garbage collection, next one in <n> seconds.", count: 27 },
+      ],
+      ["Feature Flag adManualGc enabled, performing a manual gc now", "Triggering a manual garbage collection"],
+      { warn: 54 },
+    )
+    const scrubbed = scrubCall(call)
+    assert(scrubbed.tool === "query_logs")
+    assert.deepStrictEqual(scrubbed.output.topMessages, [
+      { pattern: "Triggering a manual garbage collection, next one in <n> seconds.", count: 27 },
+    ])
+    // The surviving sample keeps its ref, so citations of it stay valid.
+    assert.deepStrictEqual(scrubbed.output.samples, [
+      { ref: "logs:ad#1", timestamp: "t", line: "Triggering a manual garbage collection" },
+    ])
+    assert.strictEqual(scrubbed.output.totalMatched, 27)
+    assert.deepStrictEqual(scrubbed.output.countsByLevel, { warn: 27 })
+    assert.notInclude(JSON.stringify(scrubbed.output), "adManualGc")
+    // Idempotent, and a clean result is returned as the same object.
+    assert.strictEqual(scrubCall(scrubbed), scrubbed)
+  })
+
+  it("keeps per-level counts when the removed lines' level is unknown", () => {
+    const call = logs([{ pattern: "adHighCpu feature flag on", count: 3 }], [], { info: 10, warn: 5 })
+    const scrubbed = scrubCall(call)
+    assert(scrubbed.tool === "query_logs")
+    assert.strictEqual(scrubbed.output.totalMatched, 12)
+    assert.deepStrictEqual(scrubbed.output.countsByLevel, { info: 10, warn: 5 })
+  })
+
+  it("leaves other tools alone", () => {
+    const metrics: RecordedToolCall = {
+      tool: "query_metrics",
+      input: { promql: 'max(jvm_cpu_recent_utilization{service_name="ad"})', start: "s", end: "e", stepSeconds: 30 },
+      output: { ref: "m", series: [] },
+    }
+    assert.strictEqual(scrubCall(metrics), metrics)
+  })
 })
 
 describe("scenario selection", () => {

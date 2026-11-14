@@ -1,14 +1,17 @@
 import { NodeHttpClient, NodeRuntime, NodeServices } from "@effect/platform-node"
+import { ReplaySnapshot } from "@incident/contracts"
 import { Console, DateTime, Duration, Effect, Layer, Option } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
 import { BudgetGuard, BudgetPolicy } from "./budget/Budget.ts"
 import { Datasets, packageRoot } from "./dataset/Datasets.ts"
+import { materializeSnapshot } from "./dataset/materialize.ts"
 import { calibrate } from "./judge/calibration.ts"
 import { Judge } from "./judge/Judge.ts"
 import { Flagd } from "./record/Flagd.ts"
 import { ObservabilityMcp } from "./record/ObservabilityMcp.ts"
 import { faultsOf, recordBatch } from "./record/Recorder.ts"
 import { Scenarios } from "./record/scenarios.ts"
+import { scrubCalls } from "./record/scrub.ts"
 import { recordedScenarioNames, selectScenarios } from "./record/selection.ts"
 
 const repoRoot = new URL("../../../", import.meta.url).pathname
@@ -124,6 +127,30 @@ const record = Command.make(
   Command.provide(Datasets.layerAt(packageRoot)),
 )
 
+const scrub = Command.make(
+  "scrub",
+  {},
+  Effect.fn(function* () {
+    const datasets = yield* Datasets
+    const cases = (yield* datasets.cases).filter((c) => c.kind === "fault" && !c.synthetic)
+    let changed = 0
+    for (const c of cases) {
+      const snapshot = yield* datasets.snapshot(c.snapshotId)
+      const calls = scrubCalls(snapshot.calls)
+      if (calls.every((call, i) => call === snapshot.calls[i])) continue
+      yield* materializeSnapshot(datasets.replayRoot, new ReplaySnapshot({ ...snapshot, calls }))
+      changed += 1
+      yield* Console.log(`${c.id}: removed fault-injection log lines`)
+    }
+    yield* Console.log(`${changed} of ${cases.length} snapshots rewritten`)
+  }),
+).pipe(
+  Command.withDescription(
+    "Remove the demo's fault-injection log lines from recorded snapshots (new recordings need no scrub)",
+  ),
+  Command.provide(Datasets.layerAt(packageRoot)),
+)
+
 const calibrateCommand = Command.make(
   "calibrate",
   { yes: Flag.Boolean("yes").pipe(Flag.withDescription("Confirm the Claude API spend"), Flag.withDefault(false)) },
@@ -149,7 +176,7 @@ const calibrateCommand = Command.make(
 )
 
 Command.make("evals").pipe(
-  Command.withSubcommands([budget, scenarios, record, calibrateCommand]),
+  Command.withSubcommands([budget, scenarios, record, scrub, calibrateCommand]),
   Command.run({ version: "0.0.0" }),
   Effect.provide(NodeServices.layer),
   NodeRuntime.runMain,
