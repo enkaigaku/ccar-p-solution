@@ -1,18 +1,19 @@
 import { NodeHttpClient, NodeRuntime, NodeServices } from "@effect/platform-node"
 import { ReplaySnapshot } from "@incident/contracts"
-import { Console, DateTime, Duration, Effect, Layer, Option } from "effect"
+import { Console, DateTime, Duration, Effect, FileSystem, Layer, Option } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
 import { BudgetGuard, BudgetPolicy } from "./budget/Budget.ts"
 import { Datasets, packageRoot } from "./dataset/Datasets.ts"
 import { materializeSnapshot } from "./dataset/materialize.ts"
 import { calibrate } from "./judge/calibration.ts"
-import { Judge } from "./judge/Judge.ts"
+import { Judge, RubricVersion } from "./judge/Judge.ts"
 import { Flagd } from "./record/Flagd.ts"
 import { ObservabilityMcp } from "./record/ObservabilityMcp.ts"
 import { faultsOf, recordBatch } from "./record/Recorder.ts"
 import { Scenarios } from "./record/scenarios.ts"
 import { scrubCalls } from "./record/scrub.ts"
 import { recordedScenarioNames, selectScenarios } from "./record/selection.ts"
+import { decodeResults, rejudge, renderSummary, summarize } from "./report/rejudge.ts"
 
 const repoRoot = new URL("../../../", import.meta.url).pathname
 
@@ -175,8 +176,34 @@ const calibrateCommand = Command.make(
   Command.provide(Layer.mergeAll(BudgetGuard.layer, Datasets.layerAt(packageRoot))),
 )
 
+const rejudgeCommand = Command.make(
+  "rejudge",
+  {
+    file: Argument.String("results").pipe(Argument.withDescription("A promptfoo --output JSON file of a finished run")),
+    yes: Flag.Boolean("yes").pipe(Flag.withDescription("Confirm the Claude API spend"), Flag.withDefault(false)),
+  },
+  Effect.fn(function* ({ file, yes }) {
+    const results = yield* decodeResults(yield* (yield* FileSystem.FileSystem).readFileString(file))
+    const cases = results.results.results.length
+    const estimate = cases * BudgetPolicy.perCaseUsd.judge
+    if (!yes) return yield* Console.log(`${cases} cases, about $${estimate.toFixed(2)}; rerun with --yes`)
+    const guard = yield* BudgetGuard
+    const label = `rejudge:${DateTime.formatIso(yield* DateTime.now)}:${cases}`
+    yield* guard.reserve("smoke", estimate, label)
+    const summary = summarize(yield* rejudge(results).pipe(Effect.provide(Judge.layerClaude)))
+    yield* guard.settle(label, summary.judgeCostUsd)
+    yield* Console.log(`${RubricVersion}, ${file}`)
+    for (const text of renderSummary(summary)) yield* Console.log(text)
+  }),
+).pipe(
+  Command.withDescription(
+    "Grade a finished run's hypotheses again with the current judge (calls Claude, runs no agent)",
+  ),
+  Command.provide(Layer.mergeAll(BudgetGuard.layer, Datasets.layerAt(packageRoot))),
+)
+
 Command.make("evals").pipe(
-  Command.withSubcommands([budget, scenarios, record, scrub, calibrateCommand]),
+  Command.withSubcommands([budget, scenarios, record, scrub, calibrateCommand, rejudgeCommand]),
   Command.run({ version: "0.0.0" }),
   Effect.provide(NodeServices.layer),
   NodeRuntime.runMain,

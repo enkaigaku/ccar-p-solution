@@ -13,6 +13,8 @@
 
 judge 分数只有在校准通过后才作数：`datasets/calibration/` 有 30 条人工打分样本（取自 2026-11-15 两次全量基线的假设，分层抽样），`pnpm --filter @incident/evals evals calibrate --yes` 计算一致率（≥ 90% 才可信，约 1.5 美元）。
 
+评分说明（`RubricVersion`）改动后，已有运行的分数不再可比。`pnpm --filter @incident/evals evals rejudge <promptfoo 的 --output 文件> --yes` 用当前 judge 给那次运行里保存的假设重新打分，不重跑 agent，并输出 top-1、top-3、带干扰与不带干扰的分组、状态分布、时延和费用（51 条约 0.3 美元）。
+
 ## 目录
 
 ```
