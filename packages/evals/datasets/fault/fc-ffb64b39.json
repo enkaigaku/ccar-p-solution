@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-ffb64b39",
+  "snapshotId": "fc-ffb64b39",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "Full manual garbage collections in the ad service pause it and raise latency.",
+    "service": "ad",
+    "acceptableAlternatives": ["GC pauses in the ad service"],
+    "fault": {
+      "flag": "adManualGc",
+      "variant": "on"
+    },
+    "distractors": [
+      {
+        "flag": "cartFailure",
+        "variant": "25%",
+        "service": "cart"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["adManualGc+cartFailure-25", "ad", "distractor"],
+  "synthetic": false
+}

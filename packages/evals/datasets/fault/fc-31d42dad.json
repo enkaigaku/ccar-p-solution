@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-31d42dad",
+  "snapshotId": "fc-31d42dad",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "Lock contention on the product catalog database slows product-catalog requests.",
+    "service": "product-catalog",
+    "acceptableAlternatives": ["product-catalog database lock contention"],
+    "fault": {
+      "flag": "productCatalogLockContention",
+      "variant": "on"
+    },
+    "distractors": [
+      {
+        "flag": "paymentFailure",
+        "variant": "50%",
+        "service": "payment"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["productCatalogLockContention+paymentFailure-50", "product-catalog", "distractor"],
+  "synthetic": false
+}

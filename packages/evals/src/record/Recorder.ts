@@ -6,6 +6,7 @@ import { materializeSnapshot } from "../dataset/materialize.ts"
 import { type Fault, Flagd } from "./Flagd.ts"
 import { type McpCallError, ObservabilityMcp, recordCall } from "./ObservabilityMcp.ts"
 import { errorRate, p95, requestRate, type Scenario } from "./scenarios.ts"
+import { scrubCalls } from "./scrub.ts"
 
 export interface RecordOptions {
   /** Package root: snapshots go to `fixtures/replay/`, cases to `datasets/fault/`. */
@@ -38,6 +39,12 @@ export const opaqueId = (prefix: "fc", scenario: string, at: DateTime.Utc) =>
     .slice(0, 8)}`
 
 const TraceIdPattern = /\b[0-9a-f]{32}\b/g
+
+/**
+ * Topology nodes that are not worth a scenario's time: `user` and `unknown` are the service graph's stand-ins for
+ * callers without telemetry, and every service talks to flagd.
+ */
+const NOT_RECORDED: ReadonlySet<string> = new Set(["user", "unknown", "flagd"])
 
 /** Every flag a scenario turns on: its fault first, then the distractors. */
 export const faultsOf = (scenario: Scenario): ReadonlyArray<Fault> => [
@@ -98,6 +105,7 @@ const battery = (scenario: Scenario, start: string, end: string) =>
     const neighbours = topology.edges
       .filter((e) => e.from === scenario.alert.service || e.to === scenario.alert.service)
       .flatMap((e) => [e.from, e.to])
+      .filter((service) => !NOT_RECORDED.has(service))
     const services = [...new Set([scenario.alert.service, ...scenario.focus, ...neighbours])].sort()
 
     const calls: Array<RecordedToolCall> = [
@@ -167,7 +175,7 @@ export const recordScenario = Effect.fn("evals.recordScenario")(function* (scena
       DateTime.subtractDuration(injectedAt, PRE_FAULT),
     )
     const calls = yield* battery(scenario, iso(start), iso(end))
-    return { firedAt, start, end, calls }
+    return { firedAt, start, end, calls: scrubCalls(calls) }
   }).pipe(Effect.ensuring(Effect.ignore(flagd.reset)))
 
   const id = opaqueId("fc", scenario.name, recorded.firedAt)

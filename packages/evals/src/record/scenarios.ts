@@ -222,7 +222,11 @@ const SingleFaults: ReadonlyArray<Scenario> = [
       rootCause: {
         service: "email",
         text: "The email service leaks memory and slows down or restarts.",
-        alternatives: [],
+        // The recorded telemetry has no memory metric: slower confirmation requests and restarts are all that shows.
+        alternatives: [
+          "the email service is degraded: its order confirmation requests are slow",
+          "the email service keeps restarting",
+        ],
       },
       focus: ["email", "checkout"],
       distractors: [],

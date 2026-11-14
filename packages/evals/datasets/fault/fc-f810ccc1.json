@@ -1,0 +1,21 @@
+{
+  "kind": "fault",
+  "id": "fc-f810ccc1",
+  "snapshotId": "fc-f810ccc1",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The ad service is CPU-saturated: something inside it burns CPU while request traffic is unchanged.",
+    "service": "ad",
+    "acceptableAlternatives": ["high CPU load in the ad service"],
+    "fault": {
+      "flag": "adHighCpu",
+      "variant": "on"
+    }
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["adHighCpu", "ad"],
+  "synthetic": false
+}

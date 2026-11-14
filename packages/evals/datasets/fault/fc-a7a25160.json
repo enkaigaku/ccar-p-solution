@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-a7a25160",
+  "snapshotId": "fc-a7a25160",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The payment service fails 10% of charge requests, so checkout cannot place orders.",
+    "service": "payment",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "paymentFailure",
+      "variant": "10%"
+    },
+    "distractors": [
+      {
+        "flag": "adManualGc",
+        "variant": "on",
+        "service": "ad"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["paymentFailure-10+adManualGc", "payment", "distractor"],
+  "synthetic": false
+}

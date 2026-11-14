@@ -1,0 +1,21 @@
+{
+  "kind": "fault",
+  "id": "fc-b1644c72",
+  "snapshotId": "fc-b1644c72",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The payment service fails 75% of charge requests, so checkout cannot place orders.",
+    "service": "payment",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "paymentFailure",
+      "variant": "75%"
+    }
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["paymentFailure-75", "payment"],
+  "synthetic": false
+}

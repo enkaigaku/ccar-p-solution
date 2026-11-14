@@ -1,0 +1,21 @@
+{
+  "kind": "fault",
+  "id": "fc-8bbb0021",
+  "snapshotId": "fc-8bbb0021",
+  "smoke": true,
+  "groundTruth": {
+    "rootCause": "The load generator floods the homepage with requests, multiplying the frontend's request rate.",
+    "service": "load-generator",
+    "acceptableAlternatives": ["a traffic spike on the homepage"],
+    "fault": {
+      "flag": "loadGeneratorFloodHomepage",
+      "variant": "on"
+    }
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["loadGeneratorFloodHomepage", "load-generator"],
+  "synthetic": false
+}

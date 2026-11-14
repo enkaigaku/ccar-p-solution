@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-2e294916",
+  "snapshotId": "fc-2e294916",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The recommendation service cache fails, so it leaks memory and slows down.",
+    "service": "recommendation",
+    "acceptableAlternatives": ["recommendation cache failure causing memory growth"],
+    "fault": {
+      "flag": "recommendationCacheFailure",
+      "variant": "on"
+    },
+    "distractors": [
+      {
+        "flag": "cartFailure",
+        "variant": "50%",
+        "service": "cart"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["recommendationCacheFailure+cartFailure-50", "recommendation", "distractor"],
+  "synthetic": false
+}

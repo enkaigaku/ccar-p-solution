@@ -1,0 +1,24 @@
+{
+  "kind": "fault",
+  "id": "fc-408727be",
+  "snapshotId": "fc-408727be",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The email service leaks memory and slows down or restarts.",
+    "service": "email",
+    "acceptableAlternatives": [
+      "the email service is degraded: its order confirmation requests are slow",
+      "the email service keeps restarting"
+    ],
+    "fault": {
+      "flag": "emailMemoryLeak",
+      "variant": "10000x"
+    }
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["emailMemoryLeak-10000x", "email"],
+  "synthetic": false
+}

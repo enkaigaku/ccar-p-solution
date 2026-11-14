@@ -1,0 +1,21 @@
+{
+  "kind": "fault",
+  "id": "fc-72d3bffc",
+  "snapshotId": "fc-72d3bffc",
+  "smoke": true,
+  "groundTruth": {
+    "rootCause": "The recommendation service cache fails, so it leaks memory and slows down.",
+    "service": "recommendation",
+    "acceptableAlternatives": ["recommendation cache failure causing memory growth"],
+    "fault": {
+      "flag": "recommendationCacheFailure",
+      "variant": "on"
+    }
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["recommendationCacheFailure", "recommendation"],
+  "synthetic": false
+}

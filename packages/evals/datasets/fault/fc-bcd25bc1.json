@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-bcd25bc1",
+  "snapshotId": "fc-bcd25bc1",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The shipping service's ship-order calls are delayed by 5sec (international shipping slowdown), so placing an order is slow.",
+    "service": "shipping",
+    "acceptableAlternatives": ["slow ship-order requests in the shipping service"],
+    "fault": {
+      "flag": "intlShippingSlowdown",
+      "variant": "5sec"
+    },
+    "distractors": [
+      {
+        "flag": "adManualGc",
+        "variant": "on",
+        "service": "ad"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["intlShippingSlowdown-5sec+adManualGc", "shipping", "distractor"],
+  "synthetic": false
+}

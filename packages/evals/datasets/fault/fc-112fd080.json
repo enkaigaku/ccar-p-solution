@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-112fd080",
+  "snapshotId": "fc-112fd080",
+  "smoke": true,
+  "groundTruth": {
+    "rootCause": "Checkout cannot reach the payment service (connection refused / unavailable).",
+    "service": "payment",
+    "acceptableAlternatives": ["payment service is down or unreachable from checkout"],
+    "fault": {
+      "flag": "paymentUnreachable",
+      "variant": "on"
+    },
+    "distractors": [
+      {
+        "flag": "adManualGc",
+        "variant": "on",
+        "service": "ad"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["paymentUnreachable+adManualGc", "payment", "distractor"],
+  "synthetic": false
+}

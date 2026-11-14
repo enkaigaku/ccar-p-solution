@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-d88c9e7c",
+  "snapshotId": "fc-d88c9e7c",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The payment service fails 100% of charge requests, so checkout cannot place orders.",
+    "service": "payment",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "paymentFailure",
+      "variant": "100%"
+    },
+    "distractors": [
+      {
+        "flag": "productCatalogLockContention",
+        "variant": "on",
+        "service": "product-catalog"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["paymentFailure-100+productCatalogLockContention", "payment", "distractor"],
+  "synthetic": false
+}
