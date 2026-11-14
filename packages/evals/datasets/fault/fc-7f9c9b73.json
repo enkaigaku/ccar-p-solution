@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-7f9c9b73",
+  "snapshotId": "fc-7f9c9b73",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The payment service fails 75% of charge requests, so checkout cannot place orders.",
+    "service": "payment",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "paymentFailure",
+      "variant": "75%"
+    },
+    "distractors": [
+      {
+        "flag": "adFailure",
+        "variant": "on",
+        "service": "ad"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["paymentFailure-75+adFailure", "payment", "distractor"],
+  "synthetic": false
+}

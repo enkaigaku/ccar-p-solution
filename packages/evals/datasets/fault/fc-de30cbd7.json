@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-de30cbd7",
+  "snapshotId": "fc-de30cbd7",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The cart service fails 75% of EmptyCart requests, so checkout's PlaceOrder calls fail.",
+    "service": "cart",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "cartFailure",
+      "variant": "75%"
+    },
+    "distractors": [
+      {
+        "flag": "adHighCpu",
+        "variant": "on",
+        "service": "ad"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["cartFailure-75+adHighCpu", "cart", "distractor"],
+  "synthetic": false
+}

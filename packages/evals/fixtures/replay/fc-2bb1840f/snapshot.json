@@ -1,0 +1,1242 @@
+{
+  "version": 1,
+  "caseId": "fc-2bb1840f",
+  "recordedAt": "2026-11-14T05:08:16.653Z",
+  "window": { "start": "2026-11-14T05:00:16.515Z", "end": "2026-11-14T05:08:16.653Z" },
+  "alert": {
+    "status": "firing",
+    "labels": { "alertname": "HighLatency", "service": "frontend-proxy", "severity": "critical" },
+    "annotations": { "summary": "frontend-proxy p95 latency is elevated" },
+    "startsAt": "2026-11-14T05:06:16.649Z",
+    "endsAt": "0001-01-01T00:00:00Z",
+    "fingerprint": "2bb1840f"
+  },
+  "calls": [
+    {
+      "tool": "get_service_topology",
+      "input": {},
+      "output": {
+        "ref": "topology-0e8f4224a536",
+        "edges": [
+          { "from": "ad", "to": "flagd", "protocol": "rpc" },
+          { "from": "ad", "to": "unknown", "protocol": "virtual_node" },
+          { "from": "cart", "to": "flagd", "protocol": "rpc" },
+          { "from": "cart", "to": "redis", "protocol": "virtual_node" },
+          { "from": "cart", "to": "unknown", "protocol": "virtual_node" },
+          { "from": "checkout", "to": "cart", "protocol": "rpc" },
+          { "from": "checkout", "to": "currency", "protocol": "rpc" },
+          { "from": "checkout", "to": "email", "protocol": "rpc" },
+          { "from": "checkout", "to": "payment", "protocol": "rpc" },
+          { "from": "checkout", "to": "product-catalog", "protocol": "rpc" },
+          { "from": "checkout", "to": "shipping", "protocol": "rpc" },
+          { "from": "frontend", "to": "ad", "protocol": "rpc" },
+          { "from": "frontend", "to": "cart", "protocol": "rpc" },
+          { "from": "frontend", "to": "checkout", "protocol": "rpc" },
+          { "from": "frontend", "to": "currency", "protocol": "rpc" },
+          { "from": "frontend", "to": "product-catalog", "protocol": "rpc" },
+          { "from": "frontend", "to": "recommendation", "protocol": "rpc" },
+          { "from": "frontend", "to": "shipping", "protocol": "rpc" },
+          { "from": "frontend", "to": "unknown", "protocol": "virtual_node" },
+          { "from": "frontend-proxy", "to": "flagd", "protocol": "rpc" },
+          { "from": "frontend-proxy", "to": "frontend", "protocol": "rpc" },
+          { "from": "frontend-proxy", "to": "image-provider", "protocol": "rpc" },
+          { "from": "frontend-web", "to": "frontend-proxy", "protocol": "rpc" },
+          { "from": "frontend-web", "to": "unknown", "protocol": "virtual_node" },
+          { "from": "load-generator", "to": "flagd", "protocol": "rpc" },
+          { "from": "load-generator", "to": "frontend-proxy", "protocol": "rpc" },
+          { "from": "load-generator", "to": "unknown", "protocol": "virtual_node" },
+          { "from": "payment", "to": "flagd", "protocol": "rpc" },
+          { "from": "product-catalog", "to": "unknown", "protocol": "virtual_node" },
+          { "from": "recommendation", "to": "flagd", "protocol": "rpc" },
+          { "from": "recommendation", "to": "product-catalog", "protocol": "rpc" },
+          { "from": "shipping", "to": "quote", "protocol": "rpc" },
+          { "from": "user", "to": "ad", "protocol": "virtual_node" },
+          { "from": "user", "to": "flagd", "protocol": "virtual_node" },
+          { "from": "user", "to": "frontend-proxy", "protocol": "virtual_node" },
+          { "from": "user", "to": "image-provider", "protocol": "virtual_node" },
+          { "from": "user", "to": "telemetry-docs", "protocol": "virtual_node" }
+        ]
+      }
+    },
+    {
+      "tool": "get_service_topology",
+      "input": { "service": "frontend-proxy" },
+      "output": {
+        "ref": "topology-e3176e31fe11",
+        "edges": [
+          { "from": "frontend-proxy", "to": "flagd", "protocol": "rpc" },
+          { "from": "frontend-proxy", "to": "frontend", "protocol": "rpc" },
+          { "from": "frontend-proxy", "to": "image-provider", "protocol": "rpc" },
+          { "from": "frontend-web", "to": "frontend-proxy", "protocol": "rpc" },
+          { "from": "load-generator", "to": "frontend-proxy", "protocol": "rpc" },
+          { "from": "user", "to": "frontend-proxy", "protocol": "virtual_node" }
+        ]
+      }
+    },
+    {
+      "tool": "get_service_status",
+      "input": {},
+      "output": {
+        "ref": "status-64a07d9d9494",
+        "services": [
+          { "name": "ad", "state": "running", "restarts": 0, "imageTag": "3.1.0-ad" },
+          { "name": "astronomy-db", "state": "running", "restarts": 0, "imageTag": "18.4" },
+          { "name": "cart", "state": "running", "restarts": 0, "imageTag": "3.1.0-cart" },
+          { "name": "checkout", "state": "running", "restarts": 0, "imageTag": "3.1.0-checkout" },
+          { "name": "currency", "state": "running", "restarts": 0, "imageTag": "3.1.0-currency" },
+          { "name": "email", "state": "running", "restarts": 5, "imageTag": "3.1.0-email" },
+          { "name": "flagd", "state": "running", "restarts": 0, "imageTag": "v0.16.0" },
+          { "name": "flagd-ui", "state": "running", "restarts": 0, "imageTag": "3.1.0-flagd-ui" },
+          { "name": "frontend", "state": "running", "restarts": 0, "imageTag": "3.1.0-frontend" },
+          { "name": "frontend-proxy", "state": "running", "restarts": 0, "imageTag": "3.1.0-frontend-proxy" },
+          { "name": "image-provider", "state": "running", "restarts": 0, "imageTag": "3.1.0-image-provider" },
+          { "name": "load-generator", "state": "running", "restarts": 0, "imageTag": "3.1.0-load-generator" },
+          { "name": "otel-collector", "state": "running", "restarts": 0, "imageTag": "0.159.0" },
+          { "name": "payment", "state": "running", "restarts": 0, "imageTag": "3.1.0-payment" },
+          { "name": "product-catalog", "state": "running", "restarts": 0, "imageTag": "3.1.0-product-catalog" },
+          { "name": "quote", "state": "running", "restarts": 0, "imageTag": "3.1.0-quote" },
+          { "name": "recommendation", "state": "running", "restarts": 6, "imageTag": "3.1.0-recommendation" },
+          { "name": "shipping", "state": "running", "restarts": 0, "imageTag": "3.1.0-shipping" },
+          { "name": "telemetry-docs", "state": "running", "restarts": 0, "imageTag": "3.1.0-telemetry-docs" },
+          { "name": "valkey-cart", "state": "running", "restarts": 0, "imageTag": "9.0.4-alpine3.23" }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"frontend-proxy\",span_name=\"GET\"}[3m])))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-ecf54d5e72c8",
+        "series": [
+          {
+            "labels": {},
+            "min": 28.7162,
+            "max": 11244.4,
+            "avg": 3144.8,
+            "last": 11244.4,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 30.3368],
+              ["2026-11-14T05:01:16.515Z", 29.4754],
+              ["2026-11-14T05:02:16.515Z", 29.3789],
+              ["2026-11-14T05:03:16.515Z", 28.7162],
+              ["2026-11-14T05:04:16.515Z", 29.6579],
+              ["2026-11-14T05:05:16.515Z", 44.0441],
+              ["2026-11-14T05:06:16.515Z", 10179.5],
+              ["2026-11-14T05:07:16.515Z", 10737.5],
+              ["2026-11-14T05:08:16.515Z", 11244.4]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"flagd\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-2b4905f31564",
+        "series": [
+          {
+            "labels": {},
+            "min": 0,
+            "max": 0.0166667,
+            "avg": 0.00392156,
+            "last": 0,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 0],
+              ["2026-11-14T05:01:16.515Z", 0],
+              ["2026-11-14T05:02:16.515Z", 0],
+              ["2026-11-14T05:03:16.515Z", 0.00833326],
+              ["2026-11-14T05:04:16.515Z", 0.0166667],
+              ["2026-11-14T05:05:16.515Z", 0.00833333],
+              ["2026-11-14T05:06:16.515Z", 0],
+              ["2026-11-14T05:07:16.515Z", 0],
+              ["2026-11-14T05:08:16.515Z", 0]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"flagd\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-ae48e2a1f053",
+        "series": [
+          {
+            "labels": {},
+            "min": 6.6915,
+            "max": 16.2001,
+            "avg": 13.025,
+            "last": 6.6915,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 16.2001],
+              ["2026-11-14T05:01:16.515Z", 16.0753],
+              ["2026-11-14T05:02:16.515Z", 16],
+              ["2026-11-14T05:03:16.515Z", 15.6415],
+              ["2026-11-14T05:04:16.515Z", 15.7333],
+              ["2026-11-14T05:05:16.515Z", 12.7],
+              ["2026-11-14T05:06:16.515Z", 8.175],
+              ["2026-11-14T05:07:16.515Z", 6.84138],
+              ["2026-11-14T05:08:16.515Z", 6.6915]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"flagd\"}[3m])))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-dc99fadccc71",
+        "series": [
+          {
+            "labels": {},
+            "min": 1.93371,
+            "max": 1.94126,
+            "avg": 1.93717,
+            "last": 1.93371,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 1.94094],
+              ["2026-11-14T05:01:16.515Z", 1.94126],
+              ["2026-11-14T05:02:16.515Z", 1.93425],
+              ["2026-11-14T05:03:16.515Z", 1.93715],
+              ["2026-11-14T05:04:16.515Z", 1.93798],
+              ["2026-11-14T05:05:16.515Z", 1.93427],
+              ["2026-11-14T05:06:16.515Z", 1.93551],
+              ["2026-11-14T05:07:16.515Z", 1.93776],
+              ["2026-11-14T05:08:16.515Z", 1.93371]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "flagd",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-52f745b55a3b", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "flagd",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-fd70ece4092c", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "flagd",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "limit": 20
+      },
+      "output": { "ref": "logs-0abae1f41807", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"frontend\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-8f28e5a651d4",
+        "series": [
+          {
+            "labels": {},
+            "min": 0,
+            "max": 0,
+            "avg": 0,
+            "last": 0,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 0],
+              ["2026-11-14T05:01:16.515Z", 0],
+              ["2026-11-14T05:02:16.515Z", 0],
+              ["2026-11-14T05:03:16.515Z", 0],
+              ["2026-11-14T05:04:16.515Z", 0],
+              ["2026-11-14T05:05:16.515Z", 0],
+              ["2026-11-14T05:06:16.515Z", 0],
+              ["2026-11-14T05:07:16.515Z", 0],
+              ["2026-11-14T05:08:16.515Z", 0]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"frontend\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-92e3e7b58d78",
+        "series": [
+          {
+            "labels": {},
+            "min": 11.7747,
+            "max": 32.1755,
+            "avg": 24.9103,
+            "last": 11.7747,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 32.1086],
+              ["2026-11-14T05:01:16.515Z", 32.1755],
+              ["2026-11-14T05:02:16.515Z", 30.8667],
+              ["2026-11-14T05:03:16.515Z", 30.9664],
+              ["2026-11-14T05:04:16.515Z", 31.625],
+              ["2026-11-14T05:05:16.515Z", 22.3833],
+              ["2026-11-14T05:06:16.515Z", 13.3333],
+              ["2026-11-14T05:07:16.515Z", 12.3912],
+              ["2026-11-14T05:08:16.515Z", 11.7747]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"frontend\"}[3m])))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-066611633733",
+        "series": [
+          {
+            "labels": {},
+            "min": 43.8278,
+            "max": 49.9231,
+            "avg": 46.7631,
+            "last": 49.9231,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 44.0749],
+              ["2026-11-14T05:01:16.515Z", 43.8278],
+              ["2026-11-14T05:02:16.515Z", 46.2944],
+              ["2026-11-14T05:03:16.515Z", 47.0602],
+              ["2026-11-14T05:04:16.515Z", 47.449],
+              ["2026-11-14T05:05:16.515Z", 48.4708],
+              ["2026-11-14T05:06:16.515Z", 47.0326],
+              ["2026-11-14T05:07:16.515Z", 48.3155],
+              ["2026-11-14T05:08:16.515Z", 49.9231]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-3f75817022c0", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-c1cabfac7157", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-b3a60203b426",
+        "totalMatched": 1349,
+        "countsByLevel": { "info": 1349 },
+        "topMessages": [
+          { "pattern": "API request completed", "count": 981 },
+          { "pattern": "Order placed successfully", "count": 19 }
+        ],
+        "samples": [
+          { "ref": "logs-b3a60203b426#0", "timestamp": "2026-11-14T05:08:12.732Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#1", "timestamp": "2026-11-14T05:08:12.663Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#2", "timestamp": "2026-11-14T05:08:12.660Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#3", "timestamp": "2026-11-14T05:08:12.560Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#4", "timestamp": "2026-11-14T05:08:12.545Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#5", "timestamp": "2026-11-14T05:08:12.541Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#6", "timestamp": "2026-11-14T05:08:12.504Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#7", "timestamp": "2026-11-14T05:08:12.493Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#8", "timestamp": "2026-11-14T05:08:12.488Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#9", "timestamp": "2026-11-14T05:08:12.482Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#10", "timestamp": "2026-11-14T05:08:12.479Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#11", "timestamp": "2026-11-14T05:08:12.469Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#12", "timestamp": "2026-11-14T05:08:12.456Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#13", "timestamp": "2026-11-14T05:08:12.451Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#14", "timestamp": "2026-11-14T05:08:12.440Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#15", "timestamp": "2026-11-14T05:08:12.440Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#16", "timestamp": "2026-11-14T05:08:10.326Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#17", "timestamp": "2026-11-14T05:08:09.794Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#18", "timestamp": "2026-11-14T05:08:08.592Z", "line": "API request completed" },
+          { "ref": "logs-b3a60203b426#19", "timestamp": "2026-11-14T05:08:03.609Z", "line": "API request completed" }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"frontend-proxy\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-9c4e9cfdd87a",
+        "series": [
+          {
+            "labels": {},
+            "min": 0,
+            "max": 0,
+            "avg": 0,
+            "last": 0,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 0],
+              ["2026-11-14T05:01:16.515Z", 0],
+              ["2026-11-14T05:02:16.515Z", 0],
+              ["2026-11-14T05:03:16.515Z", 0],
+              ["2026-11-14T05:04:16.515Z", 0],
+              ["2026-11-14T05:05:16.515Z", 0],
+              ["2026-11-14T05:06:16.515Z", 0],
+              ["2026-11-14T05:07:16.515Z", 0],
+              ["2026-11-14T05:08:16.515Z", 0]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"frontend-proxy\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-a64cf77cd779",
+        "series": [
+          {
+            "labels": {},
+            "min": 11.5497,
+            "max": 38.1673,
+            "avg": 28.0814,
+            "last": 11.5497,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 37.417],
+              ["2026-11-14T05:01:16.515Z", 38.1673],
+              ["2026-11-14T05:02:16.515Z", 37.3667],
+              ["2026-11-14T05:03:16.515Z", 36.208],
+              ["2026-11-14T05:04:16.515Z", 35.15],
+              ["2026-11-14T05:05:16.515Z", 23.9167],
+              ["2026-11-14T05:06:16.515Z", 13.05],
+              ["2026-11-14T05:07:16.515Z", 11.6412],
+              ["2026-11-14T05:08:16.515Z", 11.5497]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"frontend-proxy\"}[3m])))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-bb4c57983efd",
+        "series": [
+          {
+            "labels": {},
+            "min": 36.812,
+            "max": 4094.44,
+            "avg": 1088.76,
+            "last": 4094.44,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 37.9474],
+              ["2026-11-14T05:01:16.515Z", 36.812],
+              ["2026-11-14T05:02:16.515Z", 38.4417],
+              ["2026-11-14T05:03:16.515Z", 38.2492],
+              ["2026-11-14T05:04:16.515Z", 39.2338],
+              ["2026-11-14T05:05:16.515Z", 48.4211],
+              ["2026-11-14T05:06:16.515Z", 3182],
+              ["2026-11-14T05:07:16.515Z", 3786.11],
+              ["2026-11-14T05:08:16.515Z", 4094.44]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend-proxy",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-7ca3ac48402f", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend-proxy",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-4ca53f422eb8", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend-proxy",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-b2eda33a952e",
+        "totalMatched": 5845,
+        "countsByLevel": { "unknown": 5845 },
+        "topMessages": [
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /_next/static/chunks/<n>e<n>z<n>qjmeoq.js HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Gecko)",
+            "count": 31
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"- - HTTP/<n>\" <n> DC downstream_remote_disconnect - \"-\" <n> <n> <n> - \"-\" \"-\" \"-\" \"-\" \"-\" - - [IP]:<n> [IP]:<n> - -\n",
+            "count": 28
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /_next/static/chunks/<n>wl<n>nqxe<n>_t.js HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Gecko)",
+            "count": 26
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /api/cart?sessionId=[REDACTED]&currencyCode=USD HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like ",
+            "count": 24
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /icons/CartIcon.svg?w=<n>&q=<n> HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Gecko) HeadlessC",
+            "count": 24
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /icons/Chevron.svg HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Gecko) HeadlessChrome/[IP] Sa",
+            "count": 24
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /images/opentelemetry-demo-logo.png HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Gecko) Headl",
+            "count": 24
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /_next/static/chunks/turbopack-<n>tkucj<n>riit.js HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, lik",
+            "count": 18
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /_next/static/chunks/<n>uw<n>cbq<n>ivaz<n>.js HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Ge",
+            "count": 18
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /_next/static/chunks/<n>qxirvp<n>yjf<n>.js HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Gecko",
+            "count": 18
+          }
+        ],
+        "samples": [
+          {
+            "ref": "logs-b2eda33a952e#0",
+            "timestamp": "2026-11-14T05:08:15.898Z",
+            "line": "[2026-11-14T05:08:15.898Z] \"GET /_next/static/chunks/turbopack-0agkp_cigxvog.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 4362 0 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"b1321a8d-fdba-9031-90d5-1263bcc103f1\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41770 [IP]:8080 [IP]:46482 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#1",
+            "timestamp": "2026-11-14T05:08:15.896Z",
+            "line": "[2026-11-14T05:08:15.896Z] \"GET /_next/static/chunks/3kas5qfvja20d.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 2313 0 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"cd988daf-edec-917d-a568-98e972f17728\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41770 [IP]:8080 [IP]:46482 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#2",
+            "timestamp": "2026-11-14T05:08:15.892Z",
+            "line": "[2026-11-14T05:08:15.892Z] \"GET /_next/static/chunks/04wl69nqxe1_t.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 393 1 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"bda40a4f-707f-914e-ad7f-2cf2e908a040\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41770 [IP]:8080 [IP]:46482 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#3",
+            "timestamp": "2026-11-14T05:08:15.888Z",
+            "line": "[2026-11-14T05:08:15.888Z] \"GET /_next/static/chunks/04wl69nqxe1_t.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 393 0 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"92c78daa-963a-9f4b-a6ec-a52cb5c46fc9\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41770 [IP]:8080 [IP]:46482 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#4",
+            "timestamp": "2026-11-14T05:08:15.832Z",
+            "line": "[2026-11-14T05:08:15.832Z] \"GET /_next/static/chunks/turbopack-072tkucj7riit.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 4362 1 1 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"18f89f0a-0107-920b-ad13-c8762079f4be\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41780 [IP]:8080 [IP]:46506 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#5",
+            "timestamp": "2026-11-14T05:08:15.825Z",
+            "line": "[2026-11-14T05:08:15.825Z] \"GET /_next/static/chunks/0uw9cbq0ivaz0.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 316 3 2 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"6aecb781-955f-92c2-abab-6441fa7d8c83\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41754 [IP]:8080 [IP]:46470 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#6",
+            "timestamp": "2026-11-14T05:08:15.825Z",
+            "line": "[2026-11-14T05:08:15.825Z] \"GET /_next/static/chunks/2qxirvp2yjf01.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 9910 3 3 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"821d0af3-3b76-9add-8f8d-a13462649e94\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41780 [IP]:8080 [IP]:46506 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#7",
+            "timestamp": "2026-11-14T05:08:15.817Z",
+            "line": "[2026-11-14T05:08:15.817Z] \"GET /_next/static/chunks/3e712z4qjmeoq.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 374 1 1 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"94d4e2d0-32bc-965b-91f5-821f2e488733\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41754 [IP]:8080 [IP]:46470 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#8",
+            "timestamp": "2026-11-14T05:08:15.810Z",
+            "line": "[2026-11-14T05:08:15.810Z] \"GET /api/cart?sessionId=[REDACTED]&currencyCode=CHF HTTP/1.1\" 200 - via_upstream - \"-\" 0 24 1 1 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"77317716-2704-96e0-847a-267e12e2833f\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41754 [IP]:8080 [IP]:46470 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#9",
+            "timestamp": "2026-11-14T05:08:15.810Z",
+            "line": "[2026-11-14T05:08:15.810Z] \"GET /api/recommendations?productIds=&sessionId=[REDACTED]&currencyCode=CHF HTTP/1.1\" 200 - via_upstream - \"-\" 0 1265 34 34 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"805f8fa6-2e01-9ac8-b155-8787417236f0\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41764 [IP]:8080 [IP]:46488 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#10",
+            "timestamp": "2026-11-14T05:08:15.805Z",
+            "line": "[2026-11-14T05:08:15.805Z] \"GET /_next/static/chunks/3e712z4qjmeoq.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 374 1 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"debc541e-bc92-93ca-b8a3-a20d406952c5\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41764 [IP]:8080 [IP]:46488 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#11",
+            "timestamp": "2026-11-14T05:08:15.788Z",
+            "line": "[2026-11-14T05:08:15.788Z] \"GET /api/cart?sessionId=[REDACTED]&currencyCode=USD HTTP/1.1\" 200 - via_upstream - \"-\" 0 24 2 2 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"9461ce11-e73e-9d61-a369-0444ba400d2f\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41764 [IP]:8080 [IP]:46488 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#12",
+            "timestamp": "2026-11-14T05:08:15.786Z",
+            "line": "[2026-11-14T05:08:15.786Z] \"GET /api/recommendations?productIds=&sessionId=[REDACTED]&currencyCode=USD HTTP/1.1\" 200 - via_upstream - \"-\" 0 1270 50 49 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"5350de40-866f-966c-ba40-0f0652692dde\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41784 [IP]:8080 [IP]:46496 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#13",
+            "timestamp": "2026-11-14T05:08:15.778Z",
+            "line": "[2026-11-14T05:08:15.778Z] \"GET /api/currency? HTTP/1.1\" 200 - via_upstream - \"-\" 0 199 2 1 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"b5c1f55d-f7a4-91f8-a576-b06adf0f43a4\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41784 [IP]:8080 [IP]:46496 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#14",
+            "timestamp": "2026-11-14T05:08:15.776Z",
+            "line": "[2026-11-14T05:08:15.776Z] \"GET /api/cart?sessionId=[REDACTED]&currencyCode= HTTP/1.1\" 200 - via_upstream - \"-\" 0 24 2 2 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"cb81631c-510c-9274-9094-0efd62138bf0\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41764 [IP]:8080 [IP]:46488 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#15",
+            "timestamp": "2026-11-14T05:08:15.776Z",
+            "line": "[2026-11-14T05:08:15.776Z] \"GET /api/recommendations?productIds=&sessionId=[REDACTED]&currencyCode= HTTP/1.1\" 200 - via_upstream - \"-\" 0 1245 51 51 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"c4866b45-b98a-91a5-b273-599cac177f13\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41770 [IP]:8080 [IP]:46482 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#16",
+            "timestamp": "2026-11-14T05:08:15.758Z",
+            "line": "[2026-11-14T05:08:15.758Z] \"POST /flagservice/flagd.evaluation.v1.Service/ResolveAll HTTP/1.1\" 200 - via_upstream - \"-\" 136 369 0 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"3c33ba19-43a8-9a9e-8c37-c12c88edaeb3\" \"frontend-proxy:8080\" \"[IP]:8013\" flagservice [IP]:57024 [IP]:8080 [IP]:46482 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#17",
+            "timestamp": "2026-11-14T05:08:15.746Z",
+            "line": "[2026-11-14T05:08:15.746Z] \"GET /icons/CartIcon.svg?w=32&q=75 HTTP/1.1\" 200 - via_upstream - \"-\" 0 748 1 1 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"1a8d22fa-00b0-9d0e-b0eb-27d15ce925ff\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41770 [IP]:8080 [IP]:46482 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#18",
+            "timestamp": "2026-11-14T05:08:15.735Z",
+            "line": "[2026-11-14T05:08:15.735Z] \"GET /_next/static/chunks/2dnz54z1alpqz.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 12366 1 1 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"84ef7a6e-210e-96d0-9385-1686b87713f3\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41770 [IP]:8080 [IP]:46482 - -\n"
+          },
+          {
+            "ref": "logs-b2eda33a952e#19",
+            "timestamp": "2026-11-14T05:08:15.657Z",
+            "line": "[2026-11-14T05:08:15.657Z] \"GET /_next/static/ZEqjageQIim4DQZtdsb0h/_clientMiddlewareManifest.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 96 2 2 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"5ed2a099-369a-960f-b1bb-480b3bf2a7c6\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:41770 [IP]:8080 [IP]:46482 - -\n"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"frontend-web\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-ad291a702909",
+        "series": [
+          {
+            "labels": {},
+            "min": 0,
+            "max": 0,
+            "avg": 0,
+            "last": 0,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 0],
+              ["2026-11-14T05:01:16.515Z", 0],
+              ["2026-11-14T05:02:16.515Z", 0],
+              ["2026-11-14T05:03:16.515Z", 0],
+              ["2026-11-14T05:04:16.515Z", 0],
+              ["2026-11-14T05:05:16.515Z", 0],
+              ["2026-11-14T05:06:16.515Z", 0],
+              ["2026-11-14T05:07:16.515Z", 0],
+              ["2026-11-14T05:08:16.515Z", 0]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"frontend-web\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-ee0f7f517ff3",
+        "series": [
+          {
+            "labels": {},
+            "min": 3.93324,
+            "max": 14.5752,
+            "avg": 10.4853,
+            "last": 3.93324,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 14.4501],
+              ["2026-11-14T05:01:16.515Z", 14.5752],
+              ["2026-11-14T05:02:16.515Z", 14.2667],
+              ["2026-11-14T05:03:16.515Z", 13.4999],
+              ["2026-11-14T05:04:16.515Z", 13.1583],
+              ["2026-11-14T05:05:16.515Z", 8.81667],
+              ["2026-11-14T05:06:16.515Z", 4.325],
+              ["2026-11-14T05:07:16.515Z", 4.0665],
+              ["2026-11-14T05:08:16.515Z", 3.93324]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"frontend-web\"}[3m])))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-dfcf1b32227f",
+        "series": [
+          {
+            "labels": {},
+            "min": 49.913,
+            "max": 10280,
+            "avg": 2582.43,
+            "last": 10280,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 49.913],
+              ["2026-11-14T05:01:16.515Z", 56.7411],
+              ["2026-11-14T05:02:16.515Z", 66.7164],
+              ["2026-11-14T05:03:16.515Z", 71],
+              ["2026-11-14T05:04:16.515Z", 72.6786],
+              ["2026-11-14T05:05:16.515Z", 92.3437],
+              ["2026-11-14T05:06:16.515Z", 6281.25],
+              ["2026-11-14T05:07:16.515Z", 10120],
+              ["2026-11-14T05:08:16.515Z", 10280]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend-web",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-6bd172ec8661", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend-web",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-136b6a471011", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend-web",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "limit": 20
+      },
+      "output": { "ref": "logs-57b534e13fb9", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"image-provider\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": { "ref": "metrics-12b55d8bcd97", "series": [] }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"image-provider\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-105b853fb835",
+        "series": [
+          {
+            "labels": {},
+            "min": 0.916628,
+            "max": 5.44176,
+            "avg": 3.53824,
+            "last": 0.916644,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 5.41671],
+              ["2026-11-14T05:01:16.515Z", 5.44176],
+              ["2026-11-14T05:02:16.515Z", 5.05833],
+              ["2026-11-14T05:03:16.515Z", 4.74163],
+              ["2026-11-14T05:04:16.515Z", 4.4],
+              ["2026-11-14T05:05:16.515Z", 2.64167],
+              ["2026-11-14T05:06:16.515Z", 1],
+              ["2026-11-14T05:07:16.515Z", 0.916628],
+              ["2026-11-14T05:08:16.515Z", 0.916644]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"image-provider\"}[3m])))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-7f75a635754d",
+        "series": [
+          {
+            "labels": {},
+            "min": 1.9,
+            "max": 1.9,
+            "avg": 1.9,
+            "last": 1.9,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 1.9],
+              ["2026-11-14T05:01:16.515Z", 1.9],
+              ["2026-11-14T05:02:16.515Z", 1.9],
+              ["2026-11-14T05:03:16.515Z", 1.9],
+              ["2026-11-14T05:04:16.515Z", 1.9],
+              ["2026-11-14T05:05:16.515Z", 1.9],
+              ["2026-11-14T05:06:16.515Z", 1.9],
+              ["2026-11-14T05:07:16.515Z", 1.9],
+              ["2026-11-14T05:08:16.515Z", 1.9]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "image-provider",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-9020d684050d", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "image-provider",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-b804a2ccd588", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "image-provider",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "limit": 20
+      },
+      "output": { "ref": "logs-ce020b348124", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"load-generator\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-592550879e71",
+        "series": [
+          {
+            "labels": {},
+            "min": 0.041667,
+            "max": 0.108333,
+            "avg": 0.0720585,
+            "last": 0.0749981,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 0.041667],
+              ["2026-11-14T05:01:16.515Z", 0.0666678],
+              ["2026-11-14T05:02:16.515Z", 0.108333],
+              ["2026-11-14T05:03:16.515Z", 0.0833326],
+              ["2026-11-14T05:04:16.515Z", 0.0833333],
+              ["2026-11-14T05:05:16.515Z", 0.0833333],
+              ["2026-11-14T05:06:16.515Z", 0.05],
+              ["2026-11-14T05:07:16.515Z", 0.0583309],
+              ["2026-11-14T05:08:16.515Z", 0.0749981]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"load-generator\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-6128da9cbed2",
+        "series": [
+          {
+            "labels": {},
+            "min": 1.60829,
+            "max": 2.31667,
+            "avg": 2.01127,
+            "last": 1.60829,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 2.05835],
+              ["2026-11-14T05:01:16.515Z", 2.02503],
+              ["2026-11-14T05:02:16.515Z", 2.31667],
+              ["2026-11-14T05:03:16.515Z", 2.13332],
+              ["2026-11-14T05:04:16.515Z", 2.14167],
+              ["2026-11-14T05:05:16.515Z", 2.15],
+              ["2026-11-14T05:06:16.515Z", 1.80833],
+              ["2026-11-14T05:07:16.515Z", 1.65826],
+              ["2026-11-14T05:08:16.515Z", 1.60829]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"load-generator\"}[3m])))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-16091ebec9c9",
+        "series": [
+          {
+            "labels": {},
+            "min": 192.692,
+            "max": 3927.94,
+            "avg": 2978.37,
+            "last": 194.583,
+            "tail": [
+              ["2026-11-14T05:00:16.515Z", 3910.29],
+              ["2026-11-14T05:01:16.515Z", 3927.94],
+              ["2026-11-14T05:02:16.515Z", 3808.57],
+              ["2026-11-14T05:03:16.515Z", 3902.86],
+              ["2026-11-14T05:04:16.515Z", 3898.57],
+              ["2026-11-14T05:05:16.515Z", 3513.64],
+              ["2026-11-14T05:06:16.515Z", 2064.29],
+              ["2026-11-14T05:07:16.515Z", 192.692],
+              ["2026-11-14T05:08:16.515Z", 194.583]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "load-generator",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-213ad8e806fb", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "load-generator",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-4d4d10e505fd", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "load-generator",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-c997a8da46ef",
+        "totalMatched": 888,
+        "countsByLevel": { "info": 888 },
+        "topMessages": [
+          { "pattern": "Currency changed to CHF", "count": 94 },
+          { "pattern": "Product added to cart successfully", "count": 80 },
+          { "pattern": "User viewing cart", "count": 54 },
+          { "pattern": "User asking agent: What currencies are supported by the Astronomy Shop?", "count": 32 },
+          { "pattern": "Multi-item checkout completed for user <uuid>", "count": 32 },
+          { "pattern": "User browsing product: <n>YMWWN<n>N<n>O", "count": 26 },
+          { "pattern": "User browsing product: L<n>ECAV<n>KIM", "count": 26 },
+          { "pattern": "User browsing product: <n>ZYFJ<n>GM<n>N", "count": 24 },
+          { "pattern": "User browsing product: LS<n>PSXUNUM", "count": 24 },
+          { "pattern": "User browsing product: <n>VCHSJNUP", "count": 24 }
+        ],
+        "samples": [
+          {
+            "ref": "logs-c997a8da46ef#0",
+            "timestamp": "2026-11-14T05:08:14.459Z",
+            "line": "Product added to cart successfully"
+          },
+          {
+            "ref": "logs-c997a8da46ef#1",
+            "timestamp": "2026-11-14T05:08:14.459Z",
+            "line": "Product added to cart successfully"
+          },
+          {
+            "ref": "logs-c997a8da46ef#2",
+            "timestamp": "2026-11-14T05:08:12.728Z",
+            "line": "User browsing product: 6E92ZMYYFZ"
+          },
+          {
+            "ref": "logs-c997a8da46ef#3",
+            "timestamp": "2026-11-14T05:08:12.728Z",
+            "line": "User browsing product: 6E92ZMYYFZ"
+          },
+          {
+            "ref": "logs-c997a8da46ef#4",
+            "timestamp": "2026-11-14T05:08:12.654Z",
+            "line": "User 64319392-dfe9-11f1-8025-3ef74850948f adding 4 of product OLJCESPC7Z to cart"
+          },
+          {
+            "ref": "logs-c997a8da46ef#5",
+            "timestamp": "2026-11-14T05:08:12.654Z",
+            "line": "User 64319392-dfe9-11f1-8025-3ef74850948f adding 4 of product OLJCESPC7Z to cart"
+          },
+          {
+            "ref": "logs-c997a8da46ef#6",
+            "timestamp": "2026-11-14T05:08:11.859Z",
+            "line": "User asking agent: What current promotions are available on binoculars?"
+          },
+          {
+            "ref": "logs-c997a8da46ef#7",
+            "timestamp": "2026-11-14T05:08:11.859Z",
+            "line": "User asking agent: What current promotions are available on binoculars?"
+          },
+          {
+            "ref": "logs-c997a8da46ef#8",
+            "timestamp": "2026-11-14T05:08:10.305Z",
+            "line": "User browsing product: 9SIQT8TOJO"
+          },
+          {
+            "ref": "logs-c997a8da46ef#9",
+            "timestamp": "2026-11-14T05:08:10.305Z",
+            "line": "User browsing product: 9SIQT8TOJO"
+          },
+          {
+            "ref": "logs-c997a8da46ef#10",
+            "timestamp": "2026-11-14T05:08:09.764Z",
+            "line": "User browsing product: 1YMWWN1N4O"
+          },
+          {
+            "ref": "logs-c997a8da46ef#11",
+            "timestamp": "2026-11-14T05:08:09.764Z",
+            "line": "User browsing product: 1YMWWN1N4O"
+          },
+          {
+            "ref": "logs-c997a8da46ef#12",
+            "timestamp": "2026-11-14T05:08:08.577Z",
+            "line": "User getting ads for category: books"
+          },
+          {
+            "ref": "logs-c997a8da46ef#13",
+            "timestamp": "2026-11-14T05:08:08.577Z",
+            "line": "User getting ads for category: books"
+          },
+          {
+            "ref": "logs-c997a8da46ef#14",
+            "timestamp": "2026-11-14T05:08:03.535Z",
+            "line": "User browsing product: 2ZYFJ3GM2N"
+          },
+          {
+            "ref": "logs-c997a8da46ef#15",
+            "timestamp": "2026-11-14T05:08:03.535Z",
+            "line": "User browsing product: 2ZYFJ3GM2N"
+          },
+          {
+            "ref": "logs-c997a8da46ef#16",
+            "timestamp": "2026-11-14T05:08:02.698Z",
+            "line": "User accessing index page"
+          },
+          {
+            "ref": "logs-c997a8da46ef#17",
+            "timestamp": "2026-11-14T05:08:02.698Z",
+            "line": "User accessing index page"
+          },
+          {
+            "ref": "logs-c997a8da46ef#18",
+            "timestamp": "2026-11-14T05:08:02.065Z",
+            "line": "User accessing index page"
+          },
+          {
+            "ref": "logs-c997a8da46ef#19",
+            "timestamp": "2026-11-14T05:08:02.065Z",
+            "line": "User accessing index page"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"user\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": { "ref": "metrics-6a7de400b9a3", "series": [] }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"user\"}[3m]))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": { "ref": "metrics-7801f548a63d", "series": [] }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"user\"}[3m])))",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "stepSeconds": 30
+      },
+      "output": { "ref": "metrics-05664fdf9186", "series": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "user",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-aede465f9c71", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "user",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-cdd782879911", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "user",
+        "start": "2026-11-14T05:00:16.515Z",
+        "end": "2026-11-14T05:08:16.653Z",
+        "limit": 20
+      },
+      "output": { "ref": "logs-ede54bc0dc48", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    }
+  ]
+}

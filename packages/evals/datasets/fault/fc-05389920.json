@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-05389920",
+  "snapshotId": "fc-05389920",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The cart service fails 90% of EmptyCart requests, so checkout's PlaceOrder calls fail.",
+    "service": "cart",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "cartFailure",
+      "variant": "90%"
+    },
+    "distractors": [
+      {
+        "flag": "adManualGc",
+        "variant": "on",
+        "service": "ad"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["cartFailure-90+adManualGc", "cart", "distractor"],
+  "synthetic": false
+}

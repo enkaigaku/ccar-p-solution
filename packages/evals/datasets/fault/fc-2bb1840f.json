@@ -1,0 +1,24 @@
+{
+  "kind": "fault",
+  "id": "fc-2bb1840f",
+  "snapshotId": "fc-2bb1840f",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "Product image requests through frontend-proxy are delayed by 10sec; image-provider itself stays fast.",
+    "service": "frontend-proxy",
+    "acceptableAlternatives": [
+      "slow loading of product images",
+      "image requests are delayed before they reach image-provider"
+    ],
+    "fault": {
+      "flag": "imageSlowLoad",
+      "variant": "10sec"
+    }
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["imageSlowLoad-10sec", "frontend-proxy"],
+  "synthetic": false
+}

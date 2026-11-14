@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-1b0e6bb3",
+  "snapshotId": "fc-1b0e6bb3",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "Checkout cannot reach the payment service (connection refused / unavailable).",
+    "service": "payment",
+    "acceptableAlternatives": ["payment service is down or unreachable from checkout"],
+    "fault": {
+      "flag": "paymentUnreachable",
+      "variant": "on"
+    },
+    "distractors": [
+      {
+        "flag": "imageSlowLoad",
+        "variant": "10sec",
+        "service": "frontend-proxy"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["paymentUnreachable+imageSlowLoad-10sec", "payment", "distractor"],
+  "synthetic": false
+}

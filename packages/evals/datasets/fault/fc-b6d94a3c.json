@@ -1,0 +1,31 @@
+{
+  "kind": "fault",
+  "id": "fc-b6d94a3c",
+  "snapshotId": "fc-b6d94a3c",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "Product image requests through frontend-proxy are delayed by 10sec; image-provider itself stays fast.",
+    "service": "frontend-proxy",
+    "acceptableAlternatives": [
+      "slow loading of product images",
+      "image requests are delayed before they reach image-provider"
+    ],
+    "fault": {
+      "flag": "imageSlowLoad",
+      "variant": "10sec"
+    },
+    "distractors": [
+      {
+        "flag": "paymentFailure",
+        "variant": "50%",
+        "service": "payment"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["imageSlowLoad-10sec+paymentFailure-50", "frontend-proxy", "distractor"],
+  "synthetic": false
+}

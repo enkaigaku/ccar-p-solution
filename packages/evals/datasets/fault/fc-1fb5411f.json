@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-1fb5411f",
+  "snapshotId": "fc-1fb5411f",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The ad service is CPU-saturated: something inside it burns CPU while request traffic is unchanged.",
+    "service": "ad",
+    "acceptableAlternatives": ["high CPU load in the ad service"],
+    "fault": {
+      "flag": "adHighCpu",
+      "variant": "on"
+    },
+    "distractors": [
+      {
+        "flag": "cartFailure",
+        "variant": "50%",
+        "service": "cart"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["adHighCpu+cartFailure-50", "ad", "distractor"],
+  "synthetic": false
+}

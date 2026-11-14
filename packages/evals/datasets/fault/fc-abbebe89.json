@@ -1,0 +1,21 @@
+{
+  "kind": "fault",
+  "id": "fc-abbebe89",
+  "snapshotId": "fc-abbebe89",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "Full manual garbage collections in the ad service pause it and raise latency.",
+    "service": "ad",
+    "acceptableAlternatives": ["GC pauses in the ad service"],
+    "fault": {
+      "flag": "adManualGc",
+      "variant": "on"
+    }
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["adManualGc", "ad"],
+  "synthetic": false
+}

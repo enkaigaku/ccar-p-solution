@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-08ab6a45",
+  "snapshotId": "fc-08ab6a45",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The ad service fails GetAds requests.",
+    "service": "ad",
+    "acceptableAlternatives": [],
+    "fault": {
+      "flag": "adFailure",
+      "variant": "on"
+    },
+    "distractors": [
+      {
+        "flag": "intlShippingSlowdown",
+        "variant": "5sec",
+        "service": "shipping"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["adFailure+intlShippingSlowdown-5sec", "ad", "distractor"],
+  "synthetic": false
+}

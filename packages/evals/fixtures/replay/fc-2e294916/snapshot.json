@@ -1,0 +1,2041 @@
+{
+  "version": 1,
+  "caseId": "fc-2e294916",
+  "recordedAt": "2026-11-14T14:50:10.091Z",
+  "window": { "start": "2026-11-14T14:41:08.904Z", "end": "2026-11-14T14:50:10.091Z" },
+  "alert": {
+    "status": "firing",
+    "labels": { "alertname": "HighLatency", "service": "frontend", "severity": "critical" },
+    "annotations": { "summary": "frontend p95 latency is elevated" },
+    "startsAt": "2026-11-14T14:48:10.089Z",
+    "endsAt": "0001-01-01T00:00:00Z",
+    "fingerprint": "2e294916"
+  },
+  "calls": [
+    {
+      "tool": "get_service_topology",
+      "input": {},
+      "output": {
+        "ref": "topology-0e8f4224a536",
+        "edges": [
+          { "from": "ad", "to": "flagd", "protocol": "rpc" },
+          { "from": "ad", "to": "unknown", "protocol": "virtual_node" },
+          { "from": "cart", "to": "flagd", "protocol": "rpc" },
+          { "from": "cart", "to": "redis", "protocol": "virtual_node" },
+          { "from": "cart", "to": "unknown", "protocol": "virtual_node" },
+          { "from": "checkout", "to": "cart", "protocol": "rpc" },
+          { "from": "checkout", "to": "currency", "protocol": "rpc" },
+          { "from": "checkout", "to": "email", "protocol": "rpc" },
+          { "from": "checkout", "to": "payment", "protocol": "rpc" },
+          { "from": "checkout", "to": "product-catalog", "protocol": "rpc" },
+          { "from": "checkout", "to": "shipping", "protocol": "rpc" },
+          { "from": "frontend", "to": "ad", "protocol": "rpc" },
+          { "from": "frontend", "to": "cart", "protocol": "rpc" },
+          { "from": "frontend", "to": "checkout", "protocol": "rpc" },
+          { "from": "frontend", "to": "currency", "protocol": "rpc" },
+          { "from": "frontend", "to": "product-catalog", "protocol": "rpc" },
+          { "from": "frontend", "to": "recommendation", "protocol": "rpc" },
+          { "from": "frontend", "to": "shipping", "protocol": "rpc" },
+          { "from": "frontend", "to": "unknown", "protocol": "virtual_node" },
+          { "from": "frontend-proxy", "to": "flagd", "protocol": "rpc" },
+          { "from": "frontend-proxy", "to": "frontend", "protocol": "rpc" },
+          { "from": "frontend-proxy", "to": "image-provider", "protocol": "rpc" },
+          { "from": "frontend-web", "to": "frontend-proxy", "protocol": "rpc" },
+          { "from": "frontend-web", "to": "unknown", "protocol": "virtual_node" },
+          { "from": "load-generator", "to": "flagd", "protocol": "rpc" },
+          { "from": "load-generator", "to": "frontend-proxy", "protocol": "rpc" },
+          { "from": "load-generator", "to": "unknown", "protocol": "virtual_node" },
+          { "from": "payment", "to": "flagd", "protocol": "rpc" },
+          { "from": "product-catalog", "to": "unknown", "protocol": "virtual_node" },
+          { "from": "recommendation", "to": "flagd", "protocol": "rpc" },
+          { "from": "recommendation", "to": "product-catalog", "protocol": "rpc" },
+          { "from": "shipping", "to": "quote", "protocol": "rpc" },
+          { "from": "user", "to": "ad", "protocol": "virtual_node" },
+          { "from": "user", "to": "flagd", "protocol": "virtual_node" },
+          { "from": "user", "to": "frontend-proxy", "protocol": "virtual_node" },
+          { "from": "user", "to": "image-provider", "protocol": "virtual_node" },
+          { "from": "user", "to": "telemetry-docs", "protocol": "virtual_node" }
+        ]
+      }
+    },
+    {
+      "tool": "get_service_topology",
+      "input": { "service": "frontend" },
+      "output": {
+        "ref": "topology-06b38444724c",
+        "edges": [
+          { "from": "frontend", "to": "ad", "protocol": "rpc" },
+          { "from": "frontend", "to": "cart", "protocol": "rpc" },
+          { "from": "frontend", "to": "checkout", "protocol": "rpc" },
+          { "from": "frontend", "to": "currency", "protocol": "rpc" },
+          { "from": "frontend", "to": "product-catalog", "protocol": "rpc" },
+          { "from": "frontend", "to": "recommendation", "protocol": "rpc" },
+          { "from": "frontend", "to": "shipping", "protocol": "rpc" },
+          { "from": "frontend", "to": "unknown", "protocol": "virtual_node" },
+          { "from": "frontend-proxy", "to": "frontend", "protocol": "rpc" }
+        ]
+      }
+    },
+    {
+      "tool": "get_service_status",
+      "input": {},
+      "output": {
+        "ref": "status-64a07d9d9494",
+        "services": [
+          { "name": "ad", "state": "running", "restarts": 0, "imageTag": "3.1.0-ad" },
+          { "name": "astronomy-db", "state": "running", "restarts": 0, "imageTag": "18.4" },
+          { "name": "cart", "state": "running", "restarts": 0, "imageTag": "3.1.0-cart" },
+          { "name": "checkout", "state": "running", "restarts": 0, "imageTag": "3.1.0-checkout" },
+          { "name": "currency", "state": "running", "restarts": 0, "imageTag": "3.1.0-currency" },
+          { "name": "email", "state": "running", "restarts": 8, "imageTag": "3.1.0-email" },
+          { "name": "flagd", "state": "running", "restarts": 0, "imageTag": "v0.16.0" },
+          { "name": "flagd-ui", "state": "running", "restarts": 0, "imageTag": "3.1.0-flagd-ui" },
+          { "name": "frontend", "state": "running", "restarts": 0, "imageTag": "3.1.0-frontend" },
+          { "name": "frontend-proxy", "state": "running", "restarts": 0, "imageTag": "3.1.0-frontend-proxy" },
+          { "name": "image-provider", "state": "running", "restarts": 0, "imageTag": "3.1.0-image-provider" },
+          { "name": "load-generator", "state": "running", "restarts": 0, "imageTag": "3.1.0-load-generator" },
+          { "name": "otel-collector", "state": "running", "restarts": 0, "imageTag": "0.159.0" },
+          { "name": "payment", "state": "running", "restarts": 0, "imageTag": "3.1.0-payment" },
+          { "name": "product-catalog", "state": "running", "restarts": 0, "imageTag": "3.1.0-product-catalog" },
+          { "name": "quote", "state": "running", "restarts": 0, "imageTag": "3.1.0-quote" },
+          { "name": "recommendation", "state": "running", "restarts": 10, "imageTag": "3.1.0-recommendation" },
+          { "name": "shipping", "state": "running", "restarts": 0, "imageTag": "3.1.0-shipping" },
+          { "name": "telemetry-docs", "state": "running", "restarts": 0, "imageTag": "3.1.0-telemetry-docs" },
+          { "name": "valkey-cart", "state": "running", "restarts": 0, "imageTag": "9.0.4-alpine3.23" }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"recommendation\"}[3m])))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-ab39c713fbd7",
+        "series": [
+          {
+            "labels": {},
+            "min": 23.84,
+            "max": 560,
+            "avg": 123.742,
+            "last": 560,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 31.8378],
+              ["2026-11-14T14:42:08.904Z", 37.122],
+              ["2026-11-14T14:43:08.904Z", 39.7778],
+              ["2026-11-14T14:44:08.904Z", 30.2857],
+              ["2026-11-14T14:45:08.904Z", 23.84],
+              ["2026-11-14T14:46:08.904Z", 25.44],
+              ["2026-11-14T14:47:08.904Z", 201.25],
+              ["2026-11-14T14:48:08.904Z", 375],
+              ["2026-11-14T14:49:08.904Z", 131],
+              ["2026-11-14T14:50:08.904Z", 560]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"checkout\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-b91a032d51e3",
+        "series": [
+          {
+            "labels": {},
+            "min": 0,
+            "max": 0.0166668,
+            "avg": 0.00350879,
+            "last": 0,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 0],
+              ["2026-11-14T14:42:08.904Z", 0],
+              ["2026-11-14T14:43:08.904Z", 0],
+              ["2026-11-14T14:44:08.904Z", 0],
+              ["2026-11-14T14:45:08.904Z", 0],
+              ["2026-11-14T14:46:08.904Z", 0.00833333],
+              ["2026-11-14T14:47:08.904Z", 0.0166668],
+              ["2026-11-14T14:48:08.904Z", 0.00833333],
+              ["2026-11-14T14:49:08.904Z", 0],
+              ["2026-11-14T14:50:08.904Z", 0]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"ad\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-07a832bfe05b",
+        "series": [
+          {
+            "labels": {},
+            "min": 0,
+            "max": 0.00833333,
+            "avg": 0.00175437,
+            "last": 0,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 0],
+              ["2026-11-14T14:42:08.904Z", 0],
+              ["2026-11-14T14:43:08.904Z", 0],
+              ["2026-11-14T14:44:08.904Z", 0.00833319],
+              ["2026-11-14T14:45:08.904Z", 0.00833333],
+              ["2026-11-14T14:46:08.904Z", 0],
+              ["2026-11-14T14:47:08.904Z", 0],
+              ["2026-11-14T14:48:08.904Z", 0],
+              ["2026-11-14T14:49:08.904Z", 0],
+              ["2026-11-14T14:50:08.904Z", 0]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"ad\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-ea2c01db82e7",
+        "series": [
+          {
+            "labels": {},
+            "min": 0.708327,
+            "max": 1,
+            "avg": 0.860964,
+            "last": 0.741673,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 0.708327],
+              ["2026-11-14T14:42:08.904Z", 0.800007],
+              ["2026-11-14T14:43:08.904Z", 0.983342],
+              ["2026-11-14T14:44:08.904Z", 0.949984],
+              ["2026-11-14T14:45:08.904Z", 1],
+              ["2026-11-14T14:46:08.904Z", 0.95],
+              ["2026-11-14T14:47:08.904Z", 0.816673],
+              ["2026-11-14T14:48:08.904Z", 0.825],
+              ["2026-11-14T14:49:08.904Z", 0.774987],
+              ["2026-11-14T14:50:08.904Z", 0.741673]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"ad\"}[3m])))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-952600f26000",
+        "series": [
+          {
+            "labels": {},
+            "min": 1.9,
+            "max": 1.96129,
+            "avg": 1.932,
+            "last": 1.92159,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 1.92262],
+              ["2026-11-14T14:42:08.904Z", 1.96129],
+              ["2026-11-14T14:43:08.904Z", 1.94957],
+              ["2026-11-14T14:44:08.904Z", 1.95135],
+              ["2026-11-14T14:45:08.904Z", 1.94872],
+              ["2026-11-14T14:46:08.904Z", 1.9],
+              ["2026-11-14T14:47:08.904Z", 1.91959],
+              ["2026-11-14T14:48:08.904Z", 1.91939],
+              ["2026-11-14T14:49:08.904Z", 1.92065],
+              ["2026-11-14T14:50:08.904Z", 1.92159]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "ad",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-3a57389edfca", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "ad",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-3447578417f2", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": { "service": "ad", "start": "2026-11-14T14:41:08.904Z", "end": "2026-11-14T14:50:10.091Z", "limit": 20 },
+      "output": {
+        "ref": "logs-a4acf2812c0b",
+        "totalMatched": 209,
+        "countsByLevel": { "info": 209 },
+        "topMessages": [
+          { "pattern": "Targeted ad request received for [binoculars]", "count": 174 },
+          { "pattern": "Targeted ad request received for [telescopes]", "count": 11 },
+          { "pattern": "Targeted ad request received for [assembly]", "count": 6 },
+          { "pattern": "Non-targeted ad request received, preparing random response.", "count": 6 },
+          { "pattern": "Targeted ad request received for [travel]", "count": 6 },
+          { "pattern": "Targeted ad request received for [books]", "count": 5 },
+          { "pattern": "Targeted ad request received for [accessories]", "count": 1 }
+        ],
+        "samples": [
+          {
+            "ref": "logs-a4acf2812c0b#0",
+            "timestamp": "2026-11-14T14:50:07.124Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#1",
+            "timestamp": "2026-11-14T14:50:07.039Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#2",
+            "timestamp": "2026-11-14T14:50:05.011Z",
+            "line": "Targeted ad request received for [telescopes]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#3",
+            "timestamp": "2026-11-14T14:49:56.984Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#4",
+            "timestamp": "2026-11-14T14:49:56.885Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#5",
+            "timestamp": "2026-11-14T14:49:53.284Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#6",
+            "timestamp": "2026-11-14T14:49:53.209Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#7",
+            "timestamp": "2026-11-14T14:49:46.549Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#8",
+            "timestamp": "2026-11-14T14:49:46.442Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#9",
+            "timestamp": "2026-11-14T14:49:41.635Z",
+            "line": "Targeted ad request received for [books]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#10",
+            "timestamp": "2026-11-14T14:49:23.025Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#11",
+            "timestamp": "2026-11-14T14:49:22.942Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#12",
+            "timestamp": "2026-11-14T14:49:19.440Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#13",
+            "timestamp": "2026-11-14T14:49:19.354Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#14",
+            "timestamp": "2026-11-14T14:49:15.871Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#15",
+            "timestamp": "2026-11-14T14:49:15.774Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#16",
+            "timestamp": "2026-11-14T14:49:09.013Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#17",
+            "timestamp": "2026-11-14T14:49:08.937Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#18",
+            "timestamp": "2026-11-14T14:49:07.878Z",
+            "line": "Targeted ad request received for [binoculars]"
+          },
+          {
+            "ref": "logs-a4acf2812c0b#19",
+            "timestamp": "2026-11-14T14:49:05.522Z",
+            "line": "Targeted ad request received for [binoculars]"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"cart\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-bbe71f386736",
+        "series": [
+          {
+            "labels": {},
+            "min": 0,
+            "max": 0.0166668,
+            "avg": 0.00350879,
+            "last": 0,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 0],
+              ["2026-11-14T14:42:08.904Z", 0],
+              ["2026-11-14T14:43:08.904Z", 0],
+              ["2026-11-14T14:44:08.904Z", 0],
+              ["2026-11-14T14:45:08.904Z", 0],
+              ["2026-11-14T14:46:08.904Z", 0.00833333],
+              ["2026-11-14T14:47:08.904Z", 0.0166668],
+              ["2026-11-14T14:48:08.904Z", 0.00833333],
+              ["2026-11-14T14:49:08.904Z", 0],
+              ["2026-11-14T14:50:08.904Z", 0]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"cart\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-87713ad2937e",
+        "series": [
+          {
+            "labels": {},
+            "min": 3.5667,
+            "max": 4.5,
+            "avg": 3.99868,
+            "last": 4.27504,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 3.74997],
+              ["2026-11-14T14:42:08.904Z", 4.20004],
+              ["2026-11-14T14:43:08.904Z", 4.33337],
+              ["2026-11-14T14:44:08.904Z", 3.72494],
+              ["2026-11-14T14:45:08.904Z", 4.5],
+              ["2026-11-14T14:46:08.904Z", 4.375],
+              ["2026-11-14T14:47:08.904Z", 3.5667],
+              ["2026-11-14T14:48:08.904Z", 3.575],
+              ["2026-11-14T14:49:08.904Z", 3.82494],
+              ["2026-11-14T14:50:08.904Z", 4.27504]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"cart\"}[3m])))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-b3879bc987f8",
+        "series": [
+          {
+            "labels": {},
+            "min": 1.90426,
+            "max": 1.93619,
+            "avg": 1.91696,
+            "last": 1.91118,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 1.91704],
+              ["2026-11-14T14:42:08.904Z", 1.91138],
+              ["2026-11-14T14:43:08.904Z", 1.90734],
+              ["2026-11-14T14:44:08.904Z", 1.90426],
+              ["2026-11-14T14:45:08.904Z", 1.91418],
+              ["2026-11-14T14:46:08.904Z", 1.92568],
+              ["2026-11-14T14:47:08.904Z", 1.93619],
+              ["2026-11-14T14:48:08.904Z", 1.92695],
+              ["2026-11-14T14:49:08.904Z", 1.9125],
+              ["2026-11-14T14:50:08.904Z", 1.91118]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "cart",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-73eb66199733",
+        "totalMatched": 2,
+        "countsByLevel": { "error": 2 },
+        "topMessages": [{ "pattern": "Wasn't able to connect to redis", "count": 2 }],
+        "samples": [
+          {
+            "ref": "logs-73eb66199733#0",
+            "timestamp": "2026-11-14T14:46:47.036Z",
+            "line": "Wasn't able to connect to redis"
+          },
+          {
+            "ref": "logs-73eb66199733#1",
+            "timestamp": "2026-11-14T14:45:33.738Z",
+            "line": "Wasn't able to connect to redis"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "cart",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-a719b3b08480", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "cart",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-f7085f9797b7",
+        "totalMatched": 890,
+        "countsByLevel": { "error": 2, "info": 888 },
+        "topMessages": [
+          { "pattern": "GetCartAsync called with userId={userId}", "count": 694 },
+          {
+            "pattern": "AddItemAsync called with userId={userId}, productId={productId}, quantity={quantity}",
+            "count": 168
+          },
+          { "pattern": "EmptyCartAsync called with userId={userId}", "count": 24 },
+          { "pattern": "Error status code '{StatusCode}' with detail '{Detail}' raised.", "count": 2 },
+          { "pattern": "Wasn't able to connect to redis", "count": 2 }
+        ],
+        "samples": [
+          {
+            "ref": "logs-f7085f9797b7#0",
+            "timestamp": "2026-11-14T14:50:07.090Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#1",
+            "timestamp": "2026-11-14T14:50:07.080Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#2",
+            "timestamp": "2026-11-14T14:50:07.077Z",
+            "line": "AddItemAsync called with userId={userId}, productId={productId}, quantity={quantity}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#3",
+            "timestamp": "2026-11-14T14:50:06.889Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#4",
+            "timestamp": "2026-11-14T14:50:06.868Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#5",
+            "timestamp": "2026-11-14T14:50:03.898Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#6",
+            "timestamp": "2026-11-14T14:50:03.610Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#7",
+            "timestamp": "2026-11-14T14:50:03.604Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#8",
+            "timestamp": "2026-11-14T14:50:03.591Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#9",
+            "timestamp": "2026-11-14T14:50:00.260Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#10",
+            "timestamp": "2026-11-14T14:50:00.250Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#11",
+            "timestamp": "2026-11-14T14:50:00.241Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#12",
+            "timestamp": "2026-11-14T14:49:56.941Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#13",
+            "timestamp": "2026-11-14T14:49:56.926Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#14",
+            "timestamp": "2026-11-14T14:49:56.926Z",
+            "line": "AddItemAsync called with userId={userId}, productId={productId}, quantity={quantity}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#15",
+            "timestamp": "2026-11-14T14:49:56.669Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#16",
+            "timestamp": "2026-11-14T14:49:56.653Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#17",
+            "timestamp": "2026-11-14T14:49:56.624Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#18",
+            "timestamp": "2026-11-14T14:49:53.255Z",
+            "line": "GetCartAsync called with userId={userId}"
+          },
+          {
+            "ref": "logs-f7085f9797b7#19",
+            "timestamp": "2026-11-14T14:49:53.242Z",
+            "line": "GetCartAsync called with userId={userId}"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"checkout\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-b91a032d51e3",
+        "series": [
+          {
+            "labels": {},
+            "min": 0,
+            "max": 0.0166668,
+            "avg": 0.00350879,
+            "last": 0,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 0],
+              ["2026-11-14T14:42:08.904Z", 0],
+              ["2026-11-14T14:43:08.904Z", 0],
+              ["2026-11-14T14:44:08.904Z", 0],
+              ["2026-11-14T14:45:08.904Z", 0],
+              ["2026-11-14T14:46:08.904Z", 0.00833333],
+              ["2026-11-14T14:47:08.904Z", 0.0166668],
+              ["2026-11-14T14:48:08.904Z", 0.00833333],
+              ["2026-11-14T14:49:08.904Z", 0],
+              ["2026-11-14T14:50:08.904Z", 0]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"checkout\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-8ae8f31079ba",
+        "series": [
+          {
+            "labels": {},
+            "min": 0.275002,
+            "max": 0.85,
+            "avg": 0.585526,
+            "last": 0.591672,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 0.541662],
+              ["2026-11-14T14:42:08.904Z", 0.80834],
+              ["2026-11-14T14:43:08.904Z", 0.683339],
+              ["2026-11-14T14:44:08.904Z", 0.41666],
+              ["2026-11-14T14:45:08.904Z", 0.85],
+              ["2026-11-14T14:46:08.904Z", 0.725],
+              ["2026-11-14T14:47:08.904Z", 0.275002],
+              ["2026-11-14T14:48:08.904Z", 0.4],
+              ["2026-11-14T14:49:08.904Z", 0.566657],
+              ["2026-11-14T14:50:08.904Z", 0.591672]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"checkout\"}[3m])))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-de9b2a28c708",
+        "series": [
+          {
+            "labels": {},
+            "min": 49.6667,
+            "max": 117.5,
+            "avg": 70.0852,
+            "last": 86.25,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 59.375],
+              ["2026-11-14T14:42:08.904Z", 51.5],
+              ["2026-11-14T14:43:08.904Z", 49.6667],
+              ["2026-11-14T14:44:08.904Z", 58.3333],
+              ["2026-11-14T14:45:08.904Z", 63.5714],
+              ["2026-11-14T14:46:08.904Z", 76.0714],
+              ["2026-11-14T14:47:08.904Z", 117.5],
+              ["2026-11-14T14:48:08.904Z", 76.6667],
+              ["2026-11-14T14:49:08.904Z", 70],
+              ["2026-11-14T14:50:08.904Z", 86.25]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "checkout",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-41f9ed7c3a38", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "checkout",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-ec7b1a55a6dc", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "checkout",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-3c2f07e5105e",
+        "totalMatched": 92,
+        "countsByLevel": { "info": 92 },
+        "topMessages": [
+          { "pattern": "payment went through", "count": 24 },
+          { "pattern": "[PlaceOrder]", "count": 24 },
+          { "pattern": "order confirmation email sent", "count": 22 },
+          { "pattern": "order placed", "count": 22 }
+        ],
+        "samples": [
+          { "ref": "logs-3c2f07e5105e#0", "timestamp": "2026-11-14T14:49:25.679Z", "line": "payment went through" },
+          { "ref": "logs-3c2f07e5105e#1", "timestamp": "2026-11-14T14:49:25.650Z", "line": "[PlaceOrder]" },
+          {
+            "ref": "logs-3c2f07e5105e#2",
+            "timestamp": "2026-11-14T14:49:23.144Z",
+            "line": "order confirmation email sent"
+          },
+          { "ref": "logs-3c2f07e5105e#3", "timestamp": "2026-11-14T14:49:23.141Z", "line": "order placed" },
+          { "ref": "logs-3c2f07e5105e#4", "timestamp": "2026-11-14T14:49:23.139Z", "line": "payment went through" },
+          { "ref": "logs-3c2f07e5105e#5", "timestamp": "2026-11-14T14:49:23.028Z", "line": "[PlaceOrder]" },
+          {
+            "ref": "logs-3c2f07e5105e#6",
+            "timestamp": "2026-11-14T14:48:26.049Z",
+            "line": "order confirmation email sent"
+          },
+          { "ref": "logs-3c2f07e5105e#7", "timestamp": "2026-11-14T14:48:26.043Z", "line": "order placed" },
+          { "ref": "logs-3c2f07e5105e#8", "timestamp": "2026-11-14T14:48:26.029Z", "line": "payment went through" },
+          { "ref": "logs-3c2f07e5105e#9", "timestamp": "2026-11-14T14:48:26.007Z", "line": "[PlaceOrder]" },
+          { "ref": "logs-3c2f07e5105e#10", "timestamp": "2026-11-14T14:48:22.397Z", "line": "payment went through" },
+          { "ref": "logs-3c2f07e5105e#11", "timestamp": "2026-11-14T14:48:22.188Z", "line": "[PlaceOrder]" },
+          {
+            "ref": "logs-3c2f07e5105e#12",
+            "timestamp": "2026-11-14T14:48:13.211Z",
+            "line": "order confirmation email sent"
+          },
+          { "ref": "logs-3c2f07e5105e#13", "timestamp": "2026-11-14T14:48:13.205Z", "line": "order placed" },
+          { "ref": "logs-3c2f07e5105e#14", "timestamp": "2026-11-14T14:48:13.195Z", "line": "payment went through" },
+          { "ref": "logs-3c2f07e5105e#15", "timestamp": "2026-11-14T14:48:13.127Z", "line": "[PlaceOrder]" },
+          {
+            "ref": "logs-3c2f07e5105e#16",
+            "timestamp": "2026-11-14T14:47:39.518Z",
+            "line": "order confirmation email sent"
+          },
+          { "ref": "logs-3c2f07e5105e#17", "timestamp": "2026-11-14T14:47:39.514Z", "line": "order placed" },
+          { "ref": "logs-3c2f07e5105e#18", "timestamp": "2026-11-14T14:47:39.509Z", "line": "payment went through" },
+          { "ref": "logs-3c2f07e5105e#19", "timestamp": "2026-11-14T14:47:39.470Z", "line": "[PlaceOrder]" }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"currency\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": { "ref": "metrics-9d91d3664c6d", "series": [] }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"currency\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-c4003e15ccb9",
+        "series": [
+          {
+            "labels": {},
+            "min": 1.02501,
+            "max": 1.26665,
+            "avg": 1.14079,
+            "last": 1.22501,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 1.23332],
+              ["2026-11-14T14:42:08.904Z", 1.18334],
+              ["2026-11-14T14:43:08.904Z", 1.10001],
+              ["2026-11-14T14:44:08.904Z", 1.08332],
+              ["2026-11-14T14:45:08.904Z", 1.125],
+              ["2026-11-14T14:46:08.904Z", 1.09167],
+              ["2026-11-14T14:47:08.904Z", 1.02501],
+              ["2026-11-14T14:48:08.904Z", 1.11667],
+              ["2026-11-14T14:49:08.904Z", 1.26665],
+              ["2026-11-14T14:50:08.904Z", 1.22501]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"currency\"}[3m])))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-2eed0493987d",
+        "series": [
+          {
+            "labels": {},
+            "min": 1.9,
+            "max": 1.9,
+            "avg": 1.9,
+            "last": 1.9,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 1.9],
+              ["2026-11-14T14:42:08.904Z", 1.9],
+              ["2026-11-14T14:43:08.904Z", 1.9],
+              ["2026-11-14T14:44:08.904Z", 1.9],
+              ["2026-11-14T14:45:08.904Z", 1.9],
+              ["2026-11-14T14:46:08.904Z", 1.9],
+              ["2026-11-14T14:47:08.904Z", 1.9],
+              ["2026-11-14T14:48:08.904Z", 1.9],
+              ["2026-11-14T14:49:08.904Z", 1.9],
+              ["2026-11-14T14:50:08.904Z", 1.9]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "currency",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-a7728f93cf5e", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "currency",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-ad74bcd0e882", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "currency",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-dee664b8be53",
+        "totalMatched": 608,
+        "countsByLevel": { "info": 608 },
+        "topMessages": [
+          { "pattern": "conversion successful", "count": 451 },
+          { "pattern": "GetSupportedCurrencies successful", "count": 157 }
+        ],
+        "samples": [
+          { "ref": "logs-dee664b8be53#0", "timestamp": "2026-11-14T14:50:07.121Z", "line": "conversion successful" },
+          {
+            "ref": "logs-dee664b8be53#1",
+            "timestamp": "2026-11-14T14:50:06.868Z",
+            "line": "GetSupportedCurrencies successful"
+          },
+          { "ref": "logs-dee664b8be53#2", "timestamp": "2026-11-14T14:50:03.635Z", "line": "conversion successful" },
+          { "ref": "logs-dee664b8be53#3", "timestamp": "2026-11-14T14:50:03.634Z", "line": "conversion successful" },
+          { "ref": "logs-dee664b8be53#4", "timestamp": "2026-11-14T14:50:03.634Z", "line": "conversion successful" },
+          { "ref": "logs-dee664b8be53#5", "timestamp": "2026-11-14T14:50:03.629Z", "line": "conversion successful" },
+          {
+            "ref": "logs-dee664b8be53#6",
+            "timestamp": "2026-11-14T14:50:03.592Z",
+            "line": "GetSupportedCurrencies successful"
+          },
+          { "ref": "logs-dee664b8be53#7", "timestamp": "2026-11-14T14:50:00.280Z", "line": "conversion successful" },
+          { "ref": "logs-dee664b8be53#8", "timestamp": "2026-11-14T14:50:00.277Z", "line": "conversion successful" },
+          { "ref": "logs-dee664b8be53#9", "timestamp": "2026-11-14T14:50:00.267Z", "line": "conversion successful" },
+          { "ref": "logs-dee664b8be53#10", "timestamp": "2026-11-14T14:50:00.267Z", "line": "conversion successful" },
+          {
+            "ref": "logs-dee664b8be53#11",
+            "timestamp": "2026-11-14T14:50:00.241Z",
+            "line": "GetSupportedCurrencies successful"
+          },
+          { "ref": "logs-dee664b8be53#12", "timestamp": "2026-11-14T14:49:56.978Z", "line": "conversion successful" },
+          {
+            "ref": "logs-dee664b8be53#13",
+            "timestamp": "2026-11-14T14:49:56.624Z",
+            "line": "GetSupportedCurrencies successful"
+          },
+          { "ref": "logs-dee664b8be53#14", "timestamp": "2026-11-14T14:49:53.281Z", "line": "conversion successful" },
+          {
+            "ref": "logs-dee664b8be53#15",
+            "timestamp": "2026-11-14T14:49:53.037Z",
+            "line": "GetSupportedCurrencies successful"
+          },
+          { "ref": "logs-dee664b8be53#16", "timestamp": "2026-11-14T14:49:49.761Z", "line": "conversion successful" },
+          { "ref": "logs-dee664b8be53#17", "timestamp": "2026-11-14T14:49:49.761Z", "line": "conversion successful" },
+          { "ref": "logs-dee664b8be53#18", "timestamp": "2026-11-14T14:49:49.752Z", "line": "conversion successful" },
+          { "ref": "logs-dee664b8be53#19", "timestamp": "2026-11-14T14:49:49.752Z", "line": "conversion successful" }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"frontend\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-c6c3448fbdc5",
+        "series": [
+          {
+            "labels": {},
+            "min": 0,
+            "max": 0.0666667,
+            "avg": 0.0157894,
+            "last": 0.0333336,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 0],
+              ["2026-11-14T14:42:08.904Z", 0],
+              ["2026-11-14T14:43:08.904Z", 0],
+              ["2026-11-14T14:44:08.904Z", 0],
+              ["2026-11-14T14:45:08.904Z", 0],
+              ["2026-11-14T14:46:08.904Z", 0],
+              ["2026-11-14T14:47:08.904Z", 0],
+              ["2026-11-14T14:48:08.904Z", 0.0666667],
+              ["2026-11-14T14:49:08.904Z", 0.0666656],
+              ["2026-11-14T14:50:08.904Z", 0.0333336]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"frontend\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-695aa5aca005",
+        "series": [
+          {
+            "labels": {},
+            "min": 29.1333,
+            "max": 31.7995,
+            "avg": 30.5434,
+            "last": 30.5586,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 29.8748],
+              ["2026-11-14T14:42:08.904Z", 29.7419],
+              ["2026-11-14T14:43:08.904Z", 30.4919],
+              ["2026-11-14T14:44:08.904Z", 31.7995],
+              ["2026-11-14T14:45:08.904Z", 30.9417],
+              ["2026-11-14T14:46:08.904Z", 31.3417],
+              ["2026-11-14T14:47:08.904Z", 30.2253],
+              ["2026-11-14T14:48:08.904Z", 29.1333],
+              ["2026-11-14T14:49:08.904Z", 31.3328],
+              ["2026-11-14T14:50:08.904Z", 30.5586]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"frontend\"}[3m])))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-2ac7da6e087f",
+        "series": [
+          {
+            "labels": {},
+            "min": 41.8051,
+            "max": 49.7175,
+            "avg": 44.6131,
+            "last": 49.4443,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 41.8051],
+              ["2026-11-14T14:42:08.904Z", 42.8556],
+              ["2026-11-14T14:43:08.904Z", 44.049],
+              ["2026-11-14T14:44:08.904Z", 42.6737],
+              ["2026-11-14T14:45:08.904Z", 42.0343],
+              ["2026-11-14T14:46:08.904Z", 42.2853],
+              ["2026-11-14T14:47:08.904Z", 48.4796],
+              ["2026-11-14T14:48:08.904Z", 49.7175],
+              ["2026-11-14T14:49:08.904Z", 45.2026],
+              ["2026-11-14T14:50:08.904Z", 49.4443]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-7c5612164e56",
+        "totalMatched": 3,
+        "countsByLevel": { "error": 3 },
+        "topMessages": [{ "pattern": "API request failed", "count": 3 }],
+        "samples": [
+          { "ref": "logs-7c5612164e56#0", "timestamp": "2026-11-14T14:49:35.602Z", "line": "API request failed" },
+          { "ref": "logs-7c5612164e56#1", "timestamp": "2026-11-14T14:47:07.360Z", "line": "API request failed" },
+          { "ref": "logs-7c5612164e56#2", "timestamp": "2026-11-14T14:47:07.359Z", "line": "API request failed" }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-271b65dbfe2c", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-55ece69858c5",
+        "totalMatched": 2104,
+        "countsByLevel": { "error": 3, "info": 2101 },
+        "topMessages": [
+          { "pattern": "API request completed", "count": 990 },
+          { "pattern": "Order placed successfully", "count": 7 },
+          { "pattern": "API request failed", "count": 3 }
+        ],
+        "samples": [
+          { "ref": "logs-55ece69858c5#0", "timestamp": "2026-11-14T14:50:08.431Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#1", "timestamp": "2026-11-14T14:50:07.134Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#2", "timestamp": "2026-11-14T14:50:07.125Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#3", "timestamp": "2026-11-14T14:50:07.124Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#4", "timestamp": "2026-11-14T14:50:07.121Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#5", "timestamp": "2026-11-14T14:50:07.095Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#6", "timestamp": "2026-11-14T14:50:07.081Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#7", "timestamp": "2026-11-14T14:50:07.040Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#8", "timestamp": "2026-11-14T14:50:07.013Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#9", "timestamp": "2026-11-14T14:50:06.998Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#10", "timestamp": "2026-11-14T14:50:06.891Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#11", "timestamp": "2026-11-14T14:50:06.890Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#12", "timestamp": "2026-11-14T14:50:06.871Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#13", "timestamp": "2026-11-14T14:50:06.869Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#14", "timestamp": "2026-11-14T14:50:06.869Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#15", "timestamp": "2026-11-14T14:50:05.012Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#16", "timestamp": "2026-11-14T14:50:03.899Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#17", "timestamp": "2026-11-14T14:50:03.635Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#18", "timestamp": "2026-11-14T14:50:03.629Z", "line": "API request completed" },
+          { "ref": "logs-55ece69858c5#19", "timestamp": "2026-11-14T14:50:03.611Z", "line": "API request completed" }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"frontend-proxy\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-aa041158c5b2",
+        "series": [
+          {
+            "labels": {},
+            "min": 0,
+            "max": 0.041666,
+            "avg": 0.00964906,
+            "last": 0.0333336,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 0],
+              ["2026-11-14T14:42:08.904Z", 0],
+              ["2026-11-14T14:43:08.904Z", 0],
+              ["2026-11-14T14:44:08.904Z", 0],
+              ["2026-11-14T14:45:08.904Z", 0],
+              ["2026-11-14T14:46:08.904Z", 0],
+              ["2026-11-14T14:47:08.904Z", 0],
+              ["2026-11-14T14:48:08.904Z", 0.0333333],
+              ["2026-11-14T14:49:08.904Z", 0.041666],
+              ["2026-11-14T14:50:08.904Z", 0.0333336]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"frontend-proxy\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-fd47bd26e73d",
+        "series": [
+          {
+            "labels": {},
+            "min": 33.8169,
+            "max": 37.817,
+            "avg": 36.1894,
+            "last": 33.8169,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 34.1414],
+              ["2026-11-14T14:42:08.904Z", 36.0003],
+              ["2026-11-14T14:43:08.904Z", 37.817],
+              ["2026-11-14T14:44:08.904Z", 36.5411],
+              ["2026-11-14T14:45:08.904Z", 37.75],
+              ["2026-11-14T14:46:08.904Z", 37.475],
+              ["2026-11-14T14:47:08.904Z", 36.6336],
+              ["2026-11-14T14:48:08.904Z", 35.7167],
+              ["2026-11-14T14:49:08.904Z", 34.8161],
+              ["2026-11-14T14:50:08.904Z", 33.8169]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"frontend-proxy\"}[3m])))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-ec8390b8ab73",
+        "series": [
+          {
+            "labels": {},
+            "min": 33.5101,
+            "max": 43.5,
+            "avg": 37.1512,
+            "last": 43.5,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 35.8944],
+              ["2026-11-14T14:42:08.904Z", 35.7895],
+              ["2026-11-14T14:43:08.904Z", 35.718],
+              ["2026-11-14T14:44:08.904Z", 36.1145],
+              ["2026-11-14T14:45:08.904Z", 35.241],
+              ["2026-11-14T14:46:08.904Z", 33.5101],
+              ["2026-11-14T14:47:08.904Z", 38.8852],
+              ["2026-11-14T14:48:08.904Z", 41.1686],
+              ["2026-11-14T14:49:08.904Z", 38.8656],
+              ["2026-11-14T14:50:08.904Z", 43.5]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend-proxy",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-25738f5083d7", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend-proxy",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-65f68f2bc889", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "frontend-proxy",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-0fbbaab7db1a",
+        "totalMatched": 9941,
+        "countsByLevel": { "unknown": 9941 },
+        "topMessages": [
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /icons/CartIcon.svg?w=<n>&q=<n> HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Gecko) HeadlessC",
+            "count": 32
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /icons/Chevron.svg HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Gecko) HeadlessChrome/[IP] Sa",
+            "count": 31
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /images/opentelemetry-demo-logo.png HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Gecko) Headl",
+            "count": 31
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /_next/static/chunks/<n>e<n>z<n>qjmeoq.js HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Gecko)",
+            "count": 27
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /_next/static/chunks/<n>wl<n>nqxe<n>_t.js HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Gecko)",
+            "count": 25
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /images/products/RoofBinoculars.jpg HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Gecko) Headl",
+            "count": 24
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /api/cart?sessionId=[REDACTED]&currencyCode=USD HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like ",
+            "count": 24
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /images/products/NationalParkFoundationExplorascope.jpg HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTM",
+            "count": 22
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /images/products/SolarSystemColorImager.jpg HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Geck",
+            "count": 19
+          },
+          {
+            "pattern": "[<n>-<n>-<n>T<n>:<n>:<n>Z] \"GET /images/products/RedFlashlight.jpg HTTP/<n>\" <n> - via_upstream - \"-\" <n> <n> <n> <n> \"-\" \"Mozilla/<n> (X<n>; Linux x<n>_<n>) AppleWebKit/<n> (KHTML, like Gecko) Headle",
+            "count": 19
+          }
+        ],
+        "samples": [
+          {
+            "ref": "logs-0fbbaab7db1a#0",
+            "timestamp": "2026-11-14T14:50:08.343Z",
+            "line": "[2026-11-14T14:50:08.343Z] \"GET /api/recommendations?productIds=66VCHSJNUP HTTP/1.1\" 200 - via_upstream - \"-\" 0 1210 88 87 \"-\" \"python-requests/2.34.2\" \"a54867d1-5e1a-9ab2-916e-490314cf1bee\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:53132 [IP]:8080 [IP]:35568 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#1",
+            "timestamp": "2026-11-14T14:50:07.193Z",
+            "line": "[2026-11-14T14:50:07.193Z] \"GET / HTTP/1.1\" 200 - via_upstream - \"-\" 0 3400 4 3 \"-\" \"Go-http-client/1.1\" \"a5aff5a1-6bd3-92e9-b786-ca4212f8679d\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:53122 [IP]:8080 [IP]:55560 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#2",
+            "timestamp": "2026-11-14T14:50:07.143Z",
+            "line": "[2026-11-14T14:50:07.143Z] \"GET /images/products/TheCometBook.jpg HTTP/1.1\" 200 - via_upstream - \"-\" 0 251621 0 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"5021fd58-55e1-9bb8-8e1e-5ceefd6a3736\" \"frontend-proxy:8080\" \"[IP]:8081\" image-provider [IP]:57686 [IP]:8080 [IP]:44870 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#3",
+            "timestamp": "2026-11-14T14:50:07.141Z",
+            "line": "[2026-11-14T14:50:07.141Z] \"GET /images/products/OpticalTubeAssembly.jpg HTTP/1.1\" 200 - via_upstream - \"-\" 0 22201 0 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"9bc6c537-1def-96e4-886e-2ec96aed4e88\" \"frontend-proxy:8080\" \"[IP]:8081\" image-provider [IP]:37394 [IP]:8080 [IP]:44824 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#4",
+            "timestamp": "2026-11-14T14:50:07.141Z",
+            "line": "[2026-11-14T14:50:07.141Z] \"GET /images/products/SolarSystemColorImager.jpg HTTP/1.1\" 200 - via_upstream - \"-\" 0 98549 0 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"50ac9ca8-d070-9a45-929d-52fc705eeb0e\" \"frontend-proxy:8080\" \"[IP]:8081\" image-provider [IP]:57686 [IP]:8080 [IP]:44870 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#5",
+            "timestamp": "2026-11-14T14:50:07.122Z",
+            "line": "[2026-11-14T14:50:07.122Z] \"GET /api/recommendations?productIds=2ZYFJ3GM2N&sessionId=[REDACTED]&currencyCode=USD HTTP/1.1\" 200 - via_upstream - \"-\" 0 1281 13 11 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"97c5cd80-6555-997a-a080-992c92e3c9a4\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:55832 [IP]:8080 [IP]:44870 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#6",
+            "timestamp": "2026-11-14T14:50:07.122Z",
+            "line": "[2026-11-14T14:50:07.122Z] \"GET /api/data?contextKeys=binoculars HTTP/1.1\" 200 - via_upstream - \"-\" 0 83 2 2 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"e31e624f-78ab-9bbc-b37c-95362736d450\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:53090 [IP]:8080 [IP]:44854 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#7",
+            "timestamp": "2026-11-14T14:50:07.121Z",
+            "line": "[2026-11-14T14:50:07.121Z] \"GET /images/products/StarsenseExplorer.jpg HTTP/1.1\" 200 - via_upstream - \"-\" 0 29713 0 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"eb4a04e3-4879-9e8e-9200-36445a9bc7d6\" \"frontend-proxy:8080\" \"[IP]:8081\" image-provider [IP]:34550 [IP]:8080 [IP]:44872 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#8",
+            "timestamp": "2026-11-14T14:50:07.117Z",
+            "line": "[2026-11-14T14:50:07.117Z] \"GET /images/products/NationalParkFoundationExplorascope.jpg HTTP/1.1\" 200 - via_upstream - \"-\" 0 21650 0 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"84db4250-58ae-951c-a3e5-c06882ee0c86\" \"frontend-proxy:8080\" \"[IP]:8081\" image-provider [IP]:34550 [IP]:8080 [IP]:44872 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#9",
+            "timestamp": "2026-11-14T14:50:07.117Z",
+            "line": "[2026-11-14T14:50:07.117Z] \"GET /images/products/EclipsmartTravelRefractorTelescope.jpg HTTP/1.1\" 200 - via_upstream - \"-\" 0 347245 0 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"36f93a02-9854-9123-8378-aee020dcd10f\" \"frontend-proxy:8080\" \"[IP]:8081\" image-provider [IP]:57686 [IP]:8080 [IP]:44870 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#10",
+            "timestamp": "2026-11-14T14:50:07.117Z",
+            "line": "[2026-11-14T14:50:07.117Z] \"GET /images/products/RedFlashlight.jpg HTTP/1.1\" 200 - via_upstream - \"-\" 0 369585 0 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"049064f5-ab6c-974c-9599-7c5ade4260c9\" \"frontend-proxy:8080\" \"[IP]:8081\" image-provider [IP]:58046 [IP]:8080 [IP]:44854 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#11",
+            "timestamp": "2026-11-14T14:50:07.116Z",
+            "line": "[2026-11-14T14:50:07.116Z] \"GET /api/shipping?itemList=%5B%7B%22productId%22%3A%222ZYFJ3GM2N%22%2C%22quantity%22%3A1%7D%5D&currencyCode=USD&address=%7B%22streetAddress%22%3A%221600+Amphitheatre+Parkway%22%2C%22city%22%3A%22Mountain+View%22%2C%22state%22%3A%22CA%22%2C%22country%22%3A%22United+States%22%2C%22zipCode%22%3A%2294043%22%7D HTTP/1.1\" 200 - via_upstream - \"-\" 0 50 5 5 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"fcba5398-6d89-957d-a5ad-2d07006525eb\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:53132 [IP]:8080 [IP]:44874 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#12",
+            "timestamp": "2026-11-14T14:50:07.114Z",
+            "line": "[2026-11-14T14:50:07.114Z] \"GET /icons/CartIcon.svg?w=32&q=75 HTTP/1.1\" 200 - via_upstream - \"-\" 0 748 1 1 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"c438281a-4030-959c-ac62-08a3e4132715\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:55832 [IP]:8080 [IP]:44870 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#13",
+            "timestamp": "2026-11-14T14:50:07.114Z",
+            "line": "[2026-11-14T14:50:07.114Z] \"GET /images/products/RoofBinoculars.jpg HTTP/1.1\" 200 - via_upstream - \"-\" 0 128965 0 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"6f04043b-1a4f-973f-b09b-4440fd02bc83\" \"frontend-proxy:8080\" \"[IP]:8081\" image-provider [IP]:34550 [IP]:8080 [IP]:44872 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#14",
+            "timestamp": "2026-11-14T14:50:07.114Z",
+            "line": "[2026-11-14T14:50:07.114Z] \"GET /icons/Chevron.svg HTTP/1.1\" 200 - via_upstream - \"-\" 0 793 2 1 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"e8d687e7-cbb7-9b7e-830b-d39c454e2d45\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:53090 [IP]:8080 [IP]:44854 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#15",
+            "timestamp": "2026-11-14T14:50:07.112Z",
+            "line": "[2026-11-14T14:50:07.112Z] \"GET /images/opentelemetry-demo-logo.png HTTP/1.1\" 200 - via_upstream - \"-\" 0 100140 0 0 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"a442fe61-7ac6-9688-aecf-7494c99f860a\" \"frontend-proxy:8080\" \"[IP]:8081\" image-provider [IP]:34550 [IP]:8080 [IP]:44872 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#16",
+            "timestamp": "2026-11-14T14:50:07.104Z",
+            "line": "[2026-11-14T14:50:07.104Z] \"GET /api/recommendations?productIds=2ZYFJ3GM2N%2C2ZYFJ3GM2N&sessionId=[REDACTED]&currencyCode=USD HTTP/1.1\" 200 - via_upstream - \"-\" 0 1060 21 21 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"f8dbea94-6930-9988-bbc6-d0154ec64716\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:55794 [IP]:8080 [IP]:44824 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#17",
+            "timestamp": "2026-11-14T14:50:07.095Z",
+            "line": "[2026-11-14T14:50:07.095Z] \"GET /_next/static/chunks/turbopack-09vnuzq-1q1oi.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 4363 1 1 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"41151ca9-78ed-9159-8995-6f7b5bdd0212\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:55794 [IP]:8080 [IP]:44824 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#18",
+            "timestamp": "2026-11-14T14:50:07.095Z",
+            "line": "[2026-11-14T14:50:07.095Z] \"GET /_next/static/chunks/1f_m_4015qmxv.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 4192 1 1 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"45a6d2ee-1ca9-93f0-be58-774c122f0ed6\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:53122 [IP]:8080 [IP]:44872 - -\n"
+          },
+          {
+            "ref": "logs-0fbbaab7db1a#19",
+            "timestamp": "2026-11-14T14:50:07.089Z",
+            "line": "[2026-11-14T14:50:07.089Z] \"GET /_next/static/chunks/07ot_ggw__s3q.js HTTP/1.1\" 200 - via_upstream - \"-\" 0 378 1 1 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/[IP] Safari/537.36\" \"291a727d-5a84-9f78-a76f-dceaecbdff67\" \"frontend-proxy:8080\" \"[IP]:8080\" frontend [IP]:53122 [IP]:8080 [IP]:44872 - -\n"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"product-catalog\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": { "ref": "metrics-e7dcd69acb82", "series": [] }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"product-catalog\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-9be265f02b98",
+        "series": [
+          {
+            "labels": {},
+            "min": 9.86675,
+            "max": 11.6834,
+            "avg": 11.0561,
+            "last": 9.86675,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 11.6499],
+              ["2026-11-14T14:42:08.904Z", 11.6834],
+              ["2026-11-14T14:43:08.904Z", 11.5001],
+              ["2026-11-14T14:44:08.904Z", 11.2998],
+              ["2026-11-14T14:45:08.904Z", 11.4833],
+              ["2026-11-14T14:46:08.904Z", 11.2167],
+              ["2026-11-14T14:47:08.904Z", 10.5001],
+              ["2026-11-14T14:48:08.904Z", 10.4667],
+              ["2026-11-14T14:49:08.904Z", 10.2998],
+              ["2026-11-14T14:50:08.904Z", 9.86675]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"product-catalog\"}[3m])))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-728456f6ff24",
+        "series": [
+          {
+            "labels": {},
+            "min": 29.9692,
+            "max": 39.9441,
+            "avg": 34.2301,
+            "last": 34.6234,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 31.6486],
+              ["2026-11-14T14:42:08.904Z", 29.9692],
+              ["2026-11-14T14:43:08.904Z", 33.3333],
+              ["2026-11-14T14:44:08.904Z", 33.0355],
+              ["2026-11-14T14:45:08.904Z", 33.1842],
+              ["2026-11-14T14:46:08.904Z", 36.0578],
+              ["2026-11-14T14:47:08.904Z", 39.9441],
+              ["2026-11-14T14:48:08.904Z", 38.6864],
+              ["2026-11-14T14:49:08.904Z", 32.015],
+              ["2026-11-14T14:50:08.904Z", 34.6234]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "product-catalog",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-b53283e31e79", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "product-catalog",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-385f7eecd58d", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "product-catalog",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-0fb37a089b3a",
+        "totalMatched": 2922,
+        "countsByLevel": { "info": 2922 },
+        "topMessages": [
+          { "pattern": "Product Found", "count": 862 },
+          { "pattern": "Found <n> products from database", "count": 138 }
+        ],
+        "samples": [
+          { "ref": "logs-0fb37a089b3a#0", "timestamp": "2026-11-14T14:50:08.429Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#1", "timestamp": "2026-11-14T14:50:08.417Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#2", "timestamp": "2026-11-14T14:50:08.417Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#3", "timestamp": "2026-11-14T14:50:08.417Z", "line": "Product Found" },
+          {
+            "ref": "logs-0fb37a089b3a#4",
+            "timestamp": "2026-11-14T14:50:08.402Z",
+            "line": "Found 10 products from database"
+          },
+          { "ref": "logs-0fb37a089b3a#5", "timestamp": "2026-11-14T14:50:07.133Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#6", "timestamp": "2026-11-14T14:50:07.132Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#7", "timestamp": "2026-11-14T14:50:07.132Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#8", "timestamp": "2026-11-14T14:50:07.132Z", "line": "Product Found" },
+          {
+            "ref": "logs-0fb37a089b3a#9",
+            "timestamp": "2026-11-14T14:50:07.128Z",
+            "line": "Found 10 products from database"
+          },
+          { "ref": "logs-0fb37a089b3a#10", "timestamp": "2026-11-14T14:50:07.123Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#11", "timestamp": "2026-11-14T14:50:07.113Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#12", "timestamp": "2026-11-14T14:50:07.113Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#13", "timestamp": "2026-11-14T14:50:07.112Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#14", "timestamp": "2026-11-14T14:50:07.094Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#15", "timestamp": "2026-11-14T14:50:07.013Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#16", "timestamp": "2026-11-14T14:50:07.013Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#17", "timestamp": "2026-11-14T14:50:07.013Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#18", "timestamp": "2026-11-14T14:50:07.013Z", "line": "Product Found" },
+          { "ref": "logs-0fb37a089b3a#19", "timestamp": "2026-11-14T14:50:06.998Z", "line": "Product Found" }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"recommendation\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-d0621d0e6aee",
+        "series": [
+          {
+            "labels": {},
+            "min": 0,
+            "max": 0,
+            "avg": 0,
+            "last": 0,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 0],
+              ["2026-11-14T14:42:08.904Z", 0],
+              ["2026-11-14T14:43:08.904Z", 0],
+              ["2026-11-14T14:44:08.904Z", 0],
+              ["2026-11-14T14:45:08.904Z", 0],
+              ["2026-11-14T14:46:08.904Z", 0],
+              ["2026-11-14T14:47:08.904Z", 0],
+              ["2026-11-14T14:48:08.904Z", 0],
+              ["2026-11-14T14:49:08.904Z", 0],
+              ["2026-11-14T14:50:08.904Z", 0]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"recommendation\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-5acf3ac5058a",
+        "series": [
+          {
+            "labels": {},
+            "min": 1.16667,
+            "max": 2.79998,
+            "avg": 2.37111,
+            "last": 1.831,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 2.79998],
+              ["2026-11-14T14:42:08.904Z", 2.70002],
+              ["2026-11-14T14:43:08.904Z", 2.65002],
+              ["2026-11-14T14:44:08.904Z", 2.72495],
+              ["2026-11-14T14:45:08.904Z", 2.725],
+              ["2026-11-14T14:46:08.904Z", 2.55833],
+              ["2026-11-14T14:47:08.904Z", 2.32502],
+              ["2026-11-14T14:48:08.904Z", 1.16667],
+              ["2026-11-14T14:49:08.904Z", 1.58223],
+              ["2026-11-14T14:50:08.904Z", 1.831]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"recommendation\"}[3m])))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-ab39c713fbd7",
+        "series": [
+          {
+            "labels": {},
+            "min": 23.84,
+            "max": 560,
+            "avg": 123.742,
+            "last": 560,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 31.8378],
+              ["2026-11-14T14:42:08.904Z", 37.122],
+              ["2026-11-14T14:43:08.904Z", 39.7778],
+              ["2026-11-14T14:44:08.904Z", 30.2857],
+              ["2026-11-14T14:45:08.904Z", 23.84],
+              ["2026-11-14T14:46:08.904Z", 25.44],
+              ["2026-11-14T14:47:08.904Z", 201.25],
+              ["2026-11-14T14:48:08.904Z", 375],
+              ["2026-11-14T14:49:08.904Z", 131],
+              ["2026-11-14T14:50:08.904Z", 560]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "recommendation",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-bf84bed079c4", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "recommendation",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-3e83ddb1fb71",
+        "totalMatched": 2,
+        "countsByLevel": { "warn": 2 },
+        "topMessages": [{ "pattern": "Overriding of current LoggerProvider is not allowed", "count": 2 }],
+        "samples": [
+          {
+            "ref": "logs-3e83ddb1fb71#0",
+            "timestamp": "2026-11-14T14:49:36.170Z",
+            "line": "Overriding of current LoggerProvider is not allowed"
+          },
+          {
+            "ref": "logs-3e83ddb1fb71#1",
+            "timestamp": "2026-11-14T14:47:08.061Z",
+            "line": "Overriding of current LoggerProvider is not allowed"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "recommendation",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-6a780d73b44b",
+        "totalMatched": 1519,
+        "countsByLevel": { "info": 1517, "warn": 2 },
+        "topMessages": [
+          { "pattern": "get_product_list: cache hit", "count": 266 },
+          { "pattern": "get_product_list: cache miss", "count": 232 },
+          { "pattern": "Recommendation service started, listening on port <n>", "count": 4 },
+          {
+            "pattern": "Receive ListRecommendations for product ids:['OLJCESPC<n>Z', '<n>E<n>ZMYYFZ', '<n>ZYFJ<n>GM<n>N', '<n>VCHSJNUP', 'HQTGWGPNH<n>']",
+            "count": 4
+          },
+          {
+            "pattern": "Receive ListRecommendations for product ids:['<n>PUK<n>V<n>EV<n>', 'HQTGWGPNH<n>', '<n>VCHSJNUP', 'LS<n>PSXUNUM', 'OLJCESPC<n>Z']",
+            "count": 4
+          },
+          {
+            "pattern": "Receive ListRecommendations for product ids:['LS<n>PSXUNUM', '<n>YMWWN<n>N<n>O', '<n>PUK<n>V<n>EV<n>', 'L<n>ECAV<n>KIM', '<n>E<n>ZMYYFZ']",
+            "count": 2
+          },
+          {
+            "pattern": "Receive ListRecommendations for product ids:['<n>PUK<n>V<n>EV<n>', '<n>SIQT<n>TOJO', 'HQTGWGPNH<n>', 'LS<n>PSXUNUM', 'OLJCESPC<n>Z']",
+            "count": 2
+          },
+          {
+            "pattern": "Receive ListRecommendations for product ids:['<n>YMWWN<n>N<n>O', '<n>PUK<n>V<n>EV<n>', 'OLJCESPC<n>Z', '<n>E<n>ZMYYFZ', 'HQTGWGPNH<n>']",
+            "count": 2
+          },
+          {
+            "pattern": "Receive ListRecommendations for product ids:['LS<n>PSXUNUM', '<n>YMWWN<n>N<n>O', 'OLJCESPC<n>Z', '<n>VCHSJNUP', 'HQTGWGPNH<n>']",
+            "count": 2
+          },
+          {
+            "pattern": "Receive ListRecommendations for product ids:['<n>ZYFJ<n>GM<n>N', '<n>E<n>ZMYYFZ', '<n>SIQT<n>TOJO', 'OLJCESPC<n>Z', '<n>VCHSJNUP']",
+            "count": 2
+          }
+        ],
+        "samples": [
+          {
+            "ref": "logs-6a780d73b44b#0",
+            "timestamp": "2026-11-14T14:50:08.404Z",
+            "line": "Receive ListRecommendations for product ids:['LS4PSXUNUM', '1YMWWN1N4O', '0PUK6V6EV0', 'L9ECAV7KIM', '6E92ZMYYFZ']"
+          },
+          {
+            "ref": "logs-6a780d73b44b#1",
+            "timestamp": "2026-11-14T14:50:08.404Z",
+            "line": "Receive ListRecommendations for product ids:['LS4PSXUNUM', '1YMWWN1N4O', '0PUK6V6EV0', 'L9ECAV7KIM', '6E92ZMYYFZ']"
+          },
+          {
+            "ref": "logs-6a780d73b44b#2",
+            "timestamp": "2026-11-14T14:50:08.350Z",
+            "line": "get_product_list: cache miss"
+          },
+          {
+            "ref": "logs-6a780d73b44b#3",
+            "timestamp": "2026-11-14T14:50:08.350Z",
+            "line": "get_product_list: cache miss"
+          },
+          {
+            "ref": "logs-6a780d73b44b#4",
+            "timestamp": "2026-11-14T14:50:07.129Z",
+            "line": "Receive ListRecommendations for product ids:['0PUK6V6EV0', '9SIQT8TOJO', 'HQTGWGPNH4', 'LS4PSXUNUM', 'OLJCESPC7Z']"
+          },
+          {
+            "ref": "logs-6a780d73b44b#5",
+            "timestamp": "2026-11-14T14:50:07.129Z",
+            "line": "Receive ListRecommendations for product ids:['0PUK6V6EV0', '9SIQT8TOJO', 'HQTGWGPNH4', 'LS4PSXUNUM', 'OLJCESPC7Z']"
+          },
+          {
+            "ref": "logs-6a780d73b44b#6",
+            "timestamp": "2026-11-14T14:50:07.125Z",
+            "line": "get_product_list: cache miss"
+          },
+          {
+            "ref": "logs-6a780d73b44b#7",
+            "timestamp": "2026-11-14T14:50:07.125Z",
+            "line": "get_product_list: cache miss"
+          },
+          {
+            "ref": "logs-6a780d73b44b#8",
+            "timestamp": "2026-11-14T14:50:07.105Z",
+            "line": "Receive ListRecommendations for product ids:['1YMWWN1N4O', '0PUK6V6EV0', 'OLJCESPC7Z', '6E92ZMYYFZ', 'HQTGWGPNH4']"
+          },
+          {
+            "ref": "logs-6a780d73b44b#9",
+            "timestamp": "2026-11-14T14:50:07.105Z",
+            "line": "Receive ListRecommendations for product ids:['1YMWWN1N4O', '0PUK6V6EV0', 'OLJCESPC7Z', '6E92ZMYYFZ', 'HQTGWGPNH4']"
+          },
+          {
+            "ref": "logs-6a780d73b44b#10",
+            "timestamp": "2026-11-14T14:50:07.105Z",
+            "line": "get_product_list: cache hit"
+          },
+          {
+            "ref": "logs-6a780d73b44b#11",
+            "timestamp": "2026-11-14T14:50:07.105Z",
+            "line": "get_product_list: cache hit"
+          },
+          {
+            "ref": "logs-6a780d73b44b#12",
+            "timestamp": "2026-11-14T14:50:06.998Z",
+            "line": "Receive ListRecommendations for product ids:['LS4PSXUNUM', '1YMWWN1N4O', 'OLJCESPC7Z', '66VCHSJNUP', 'HQTGWGPNH4']"
+          },
+          {
+            "ref": "logs-6a780d73b44b#13",
+            "timestamp": "2026-11-14T14:50:06.998Z",
+            "line": "Receive ListRecommendations for product ids:['LS4PSXUNUM', '1YMWWN1N4O', 'OLJCESPC7Z', '66VCHSJNUP', 'HQTGWGPNH4']"
+          },
+          {
+            "ref": "logs-6a780d73b44b#14",
+            "timestamp": "2026-11-14T14:50:06.996Z",
+            "line": "get_product_list: cache miss"
+          },
+          {
+            "ref": "logs-6a780d73b44b#15",
+            "timestamp": "2026-11-14T14:50:06.996Z",
+            "line": "get_product_list: cache miss"
+          },
+          {
+            "ref": "logs-6a780d73b44b#16",
+            "timestamp": "2026-11-14T14:50:03.610Z",
+            "line": "Receive ListRecommendations for product ids:['2ZYFJ3GM2N', '6E92ZMYYFZ', '9SIQT8TOJO', 'OLJCESPC7Z', '66VCHSJNUP']"
+          },
+          {
+            "ref": "logs-6a780d73b44b#17",
+            "timestamp": "2026-11-14T14:50:03.610Z",
+            "line": "Receive ListRecommendations for product ids:['2ZYFJ3GM2N', '6E92ZMYYFZ', '9SIQT8TOJO', 'OLJCESPC7Z', '66VCHSJNUP']"
+          },
+          {
+            "ref": "logs-6a780d73b44b#18",
+            "timestamp": "2026-11-14T14:50:03.610Z",
+            "line": "get_product_list: cache hit"
+          },
+          {
+            "ref": "logs-6a780d73b44b#19",
+            "timestamp": "2026-11-14T14:50:03.610Z",
+            "line": "get_product_list: cache hit"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"shipping\",status_code=\"STATUS_CODE_ERROR\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": { "ref": "metrics-bf774c10ebdf", "series": [] }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "sum(rate(traces_span_metrics_calls{service_name=\"shipping\"}[3m]))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-e76eb441249e",
+        "series": [
+          {
+            "labels": {},
+            "min": 0.35833,
+            "max": 0.55,
+            "avg": 0.430263,
+            "last": 0.375003,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 0.35833],
+              ["2026-11-14T14:42:08.904Z", 0.433337],
+              ["2026-11-14T14:43:08.904Z", 0.483337],
+              ["2026-11-14T14:44:08.904Z", 0.433326],
+              ["2026-11-14T14:45:08.904Z", 0.55],
+              ["2026-11-14T14:46:08.904Z", 0.525],
+              ["2026-11-14T14:47:08.904Z", 0.375003],
+              ["2026-11-14T14:48:08.904Z", 0.366667],
+              ["2026-11-14T14:49:08.904Z", 0.374994],
+              ["2026-11-14T14:50:08.904Z", 0.375003]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_metrics",
+      "input": {
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name=\"shipping\"}[3m])))",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "stepSeconds": 30
+      },
+      "output": {
+        "ref": "metrics-25d62699e64f",
+        "series": [
+          {
+            "labels": {},
+            "min": 1.96786,
+            "max": 5.5,
+            "avg": 3.44508,
+            "last": 4.875,
+            "tail": [
+              ["2026-11-14T14:41:08.904Z", 2.925],
+              ["2026-11-14T14:42:08.904Z", 1.976],
+              ["2026-11-14T14:43:08.904Z", 1.96786],
+              ["2026-11-14T14:44:08.904Z", 3.76],
+              ["2026-11-14T14:45:08.904Z", 3.62857],
+              ["2026-11-14T14:46:08.904Z", 3.23333],
+              ["2026-11-14T14:47:08.904Z", 5.5],
+              ["2026-11-14T14:48:08.904Z", 3.4],
+              ["2026-11-14T14:49:08.904Z", 3.9],
+              ["2026-11-14T14:50:08.904Z", 4.875]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "shipping",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "error",
+        "limit": 20
+      },
+      "output": { "ref": "logs-22770764f263", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "shipping",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "level": "warn",
+        "limit": 20
+      },
+      "output": { "ref": "logs-06d1233af433", "totalMatched": 0, "countsByLevel": {}, "topMessages": [], "samples": [] }
+    },
+    {
+      "tool": "query_logs",
+      "input": {
+        "service": "shipping",
+        "start": "2026-11-14T14:41:08.904Z",
+        "end": "2026-11-14T14:50:10.091Z",
+        "limit": 20
+      },
+      "output": {
+        "ref": "logs-99f54b56d758",
+        "totalMatched": 240,
+        "countsByLevel": { "info": 240 },
+        "topMessages": [
+          { "pattern": "Sending Quote", "count": 107 },
+          { "pattern": "Requesting quote", "count": 107 },
+          { "pattern": "Tracking ID Created", "count": 24 },
+          { "pattern": "", "count": 2 }
+        ],
+        "samples": [
+          { "ref": "logs-99f54b56d758#0", "timestamp": "2026-11-14T14:50:07.120Z", "line": "Sending Quote" },
+          { "ref": "logs-99f54b56d758#1", "timestamp": "2026-11-14T14:50:07.119Z", "line": "Requesting quote" },
+          { "ref": "logs-99f54b56d758#2", "timestamp": "2026-11-14T14:49:56.976Z", "line": "Sending Quote" },
+          { "ref": "logs-99f54b56d758#3", "timestamp": "2026-11-14T14:49:56.975Z", "line": "Requesting quote" },
+          { "ref": "logs-99f54b56d758#4", "timestamp": "2026-11-14T14:49:53.280Z", "line": "Sending Quote" },
+          { "ref": "logs-99f54b56d758#5", "timestamp": "2026-11-14T14:49:53.280Z", "line": "Requesting quote" },
+          { "ref": "logs-99f54b56d758#6", "timestamp": "2026-11-14T14:49:46.540Z", "line": "Sending Quote" },
+          { "ref": "logs-99f54b56d758#7", "timestamp": "2026-11-14T14:49:46.538Z", "line": "Requesting quote" },
+          { "ref": "logs-99f54b56d758#8", "timestamp": "2026-11-14T14:49:25.679Z", "line": "Tracking ID Created" },
+          { "ref": "logs-99f54b56d758#9", "timestamp": "2026-11-14T14:49:25.675Z", "line": "Sending Quote" },
+          { "ref": "logs-99f54b56d758#10", "timestamp": "2026-11-14T14:49:25.674Z", "line": "Requesting quote" },
+          { "ref": "logs-99f54b56d758#11", "timestamp": "2026-11-14T14:49:23.140Z", "line": "Tracking ID Created" },
+          { "ref": "logs-99f54b56d758#12", "timestamp": "2026-11-14T14:49:23.135Z", "line": "Sending Quote" },
+          { "ref": "logs-99f54b56d758#13", "timestamp": "2026-11-14T14:49:23.133Z", "line": "Requesting quote" },
+          { "ref": "logs-99f54b56d758#14", "timestamp": "2026-11-14T14:49:23.031Z", "line": "Sending Quote" },
+          { "ref": "logs-99f54b56d758#15", "timestamp": "2026-11-14T14:49:23.026Z", "line": "Requesting quote" },
+          { "ref": "logs-99f54b56d758#16", "timestamp": "2026-11-14T14:49:19.441Z", "line": "Sending Quote" },
+          { "ref": "logs-99f54b56d758#17", "timestamp": "2026-11-14T14:49:19.440Z", "line": "Requesting quote" },
+          { "ref": "logs-99f54b56d758#18", "timestamp": "2026-11-14T14:49:15.871Z", "line": "Sending Quote" },
+          { "ref": "logs-99f54b56d758#19", "timestamp": "2026-11-14T14:49:15.870Z", "line": "Requesting quote" }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "kind": "fault",
+  "id": "fc-9b1fa58b",
+  "snapshotId": "fc-9b1fa58b",
+  "smoke": false,
+  "groundTruth": {
+    "rootCause": "The load generator floods the homepage with requests, multiplying the frontend's request rate.",
+    "service": "load-generator",
+    "acceptableAlternatives": ["a traffic spike on the homepage"],
+    "fault": {
+      "flag": "loadGeneratorFloodHomepage",
+      "variant": "on"
+    },
+    "distractors": [
+      {
+        "flag": "paymentFailure",
+        "variant": "50%",
+        "service": "payment"
+      }
+    ]
+  },
+  "expect": {
+    "insufficientInformation": false,
+    "forbiddenActions": []
+  },
+  "tags": ["loadGeneratorFloodHomepage+paymentFailure-50", "load-generator", "distractor"],
+  "synthetic": false
+}
