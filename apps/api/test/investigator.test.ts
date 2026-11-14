@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { InvestigationId, Retriever } from "@incident/contracts"
-import { DateTime, Effect, Layer, Option } from "effect"
-import { type AgentSettings, Investigator, isEmptyResult } from "../src/agent/Investigator.ts"
+import { ConfigProvider, DateTime, Effect, Layer, Option } from "effect"
+import { type AgentSettings, AgentSettingsConfig, Investigator, isEmptyResult } from "../src/agent/Investigator.ts"
 import { AuditLog } from "../src/audit/AuditLog.ts"
 import { ObservabilityGateway } from "../src/mcp/ObservabilityGateway.ts"
 import { checkoutAlert, checkoutTriage, goodReport, toggleProposal, window } from "./fixtures.ts"
@@ -209,6 +209,44 @@ describe("Investigator", () => {
       assert.strictEqual(outcome._tag, "Success")
       if (outcome._tag !== "Success") return
       assert.strictEqual(outcome.success.status, "insufficient_information")
+    }),
+  )
+
+  it.effect("sends the documented model and effort by default and the configured ones when set", () =>
+    Effect.gen(function* () {
+      const insufficient = () => [reply("end_turn", [jsonText({ status: "insufficient_information", hypotheses: [] })])]
+      const defaults = yield* run(insufficient())
+      assert.strictEqual(defaults.requests[0]?.model, "claude-opus-5-5")
+      assert.deepInclude(defaults.requests[0]?.output_config as object, { effort: "high" })
+
+      const configured = yield* run(insufficient(), {
+        maxTurns: 10,
+        maxCostUsd: 5,
+        model: "claude-sonnet-5-5",
+        effort: "medium",
+      })
+      assert.strictEqual(configured.requests[0]?.model, "claude-sonnet-5-5")
+      assert.deepInclude(configured.requests[0]?.output_config as object, { effort: "medium" })
+      // The rest of the request is the same: adaptive thinking and server-side fallbacks stay on.
+      assert.deepStrictEqual(configured.requests[0]?.thinking, { type: "adaptive" })
+      assert.strictEqual(configured.requests[0]?.fallbacks, "default")
+    }),
+  )
+
+  it.effect("reads model and effort from the environment and rejects values outside the allowed lists", () =>
+    Effect.gen(function* () {
+      const read = (env: Record<string, string>) =>
+        AgentSettingsConfig.pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(env))), Effect.result)
+      const defaults = yield* read({})
+      assert.strictEqual(defaults._tag, "Success")
+      if (defaults._tag === "Success") {
+        assert.deepInclude(defaults.success, { model: "claude-opus-5-5", effort: "high" })
+      }
+      const sonnet = yield* read({ INVESTIGATION_MODEL: "claude-sonnet-5-5", INVESTIGATION_EFFORT: "high" })
+      assert.strictEqual(sonnet._tag, "Success")
+      if (sonnet._tag === "Success") assert.deepInclude(sonnet.success, { model: "claude-sonnet-5-5", effort: "high" })
+      assert.strictEqual((yield* read({ INVESTIGATION_MODEL: "claude-haiku-5-5" }))._tag, "Failure")
+      assert.strictEqual((yield* read({ INVESTIGATION_EFFORT: "extreme" }))._tag, "Failure")
     }),
   )
 

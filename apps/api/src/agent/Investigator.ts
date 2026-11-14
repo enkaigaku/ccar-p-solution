@@ -27,7 +27,14 @@ import type { TriageResult } from "../triage/Triage.ts"
 import { addUsage, emptyUsage } from "../usage.ts"
 import { agentTools, isObservabilityTool, PROPOSE_ACTION, ReportJsonSchema, SEARCH_KNOWLEDGE } from "./tools.ts"
 
-export const InvestigationModel = "claude-opus-5-5"
+/** Models the investigation may run on. The default is the documented one; the others exist for evaluation A/B runs. */
+export const InvestigationModels = ["claude-opus-5-5", "claude-sonnet-5-5"] as const
+export type InvestigationModel = (typeof InvestigationModels)[number]
+export const InvestigationModel: InvestigationModel = "claude-opus-5-5"
+
+export const InvestigationEfforts = ["low", "medium", "high", "xhigh", "max"] as const
+export type InvestigationEffort = (typeof InvestigationEfforts)[number]
+export const InvestigationEffort: InvestigationEffort = "high"
 const FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 /** Proposals are only turned into approval requests when the top hypothesis is at least this confident. */
@@ -41,11 +48,17 @@ export interface AgentSettings {
   readonly maxTurns: number
   /** Spend (USD) after which the agent must answer without tools. */
   readonly maxCostUsd: number
+  /** Defaults to `InvestigationModel`. */
+  readonly model?: InvestigationModel
+  /** Always sent explicitly; defaults to `InvestigationEffort`. */
+  readonly effort?: InvestigationEffort
 }
 
 export const AgentSettingsConfig = Config.all({
   maxTurns: Config.Int("AGENT_MAX_TURNS").pipe(Config.withDefault(12)),
   maxCostUsd: Config.Number("AGENT_MAX_COST_USD").pipe(Config.withDefault(0.6)),
+  model: Config.Literals(InvestigationModels, "INVESTIGATION_MODEL").pipe(Config.withDefault(InvestigationModel)),
+  effort: Config.Literals(InvestigationEfforts, "INVESTIGATION_EFFORT").pipe(Config.withDefault(InvestigationEffort)),
 })
 
 export interface ProposalDraft {
@@ -207,6 +220,8 @@ export class Investigator extends Context.Service<
       const retriever = yield* Retriever
       const events = yield* InvestigationEvents
       const audit = yield* AuditLog
+      const model = settings.model ?? InvestigationModel
+      const effort = settings.effort ?? InvestigationEffort
 
       const investigate = Effect.fn("Investigator.investigate")(function* (input: InvestigationInput) {
         const { investigationId, alert, triage } = input
@@ -219,7 +234,7 @@ export class Investigator extends Context.Service<
         const cost = yield* Ref.make(emptyUsage)
         let toolCalls = 0
         let indexVersion = "none"
-        let servedModel = InvestigationModel
+        let servedModel: string = model
 
         const auditPayload = (kind: "llm_request" | "llm_response" | "tool_result", subject: string, payload: string) =>
           audit.append({ kind, investigationId, subject, payload })
@@ -310,7 +325,7 @@ export class Investigator extends Context.Service<
           promptVersion,
           renderedPrompt: `${InvestigationPrompt.text}\n${stable}\n${volatile}`,
         })
-        yield* auditPayload("llm_request", InvestigationModel, canonicalJson({ system, tools, messages }))
+        yield* auditPayload("llm_request", model, canonicalJson({ system, tools, messages }))
 
         const runTool = (block: Anthropic.Beta.BetaToolUseBlock) =>
           Effect.gen(function* () {
@@ -430,12 +445,12 @@ export class Investigator extends Context.Service<
           turn++
           yield* events.publish(new StepStarted({ investigationId, step: "agent_turn", turn }))
           const params: MessageParams = {
-            model: InvestigationModel,
+            model,
             max_tokens: 16_000,
             betas: [FALLBACK_BETA],
             fallbacks: "default",
             thinking: { type: "adaptive" },
-            output_config: { effort: "high", format: { type: "json_schema", schema: ReportJsonSchema } },
+            output_config: { effort, format: { type: "json_schema", schema: ReportJsonSchema } },
             system,
             tools,
             // Caches the growing conversation turn by turn (the 3rd breakpoint after system and stable context).
@@ -445,7 +460,7 @@ export class Investigator extends Context.Service<
           }
           const response = yield* claude.create(params).pipe(
             Effect.tap((r) =>
-              recordClaudeResponse({ step: "investigate", requestedModel: InvestigationModel }, r).pipe(
+              recordClaudeResponse({ step: "investigate", requestedModel: model }, r).pipe(
                 Effect.flatMap((c) => Ref.update(cost, (total) => addUsage(total, r.usage, c))),
               ),
             ),
