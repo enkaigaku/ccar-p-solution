@@ -20,7 +20,7 @@ describe("evaluation gate", () => {
     const report = gate(results(row("fc-1"), row("fc-2", { namedScores: hit })), { minCases: 2 })
     assert.isTrue(report.pass)
     assert.include(report.lines, "citation_validity: 2/2")
-    assert.include(report.lines, "root_cause top-3: 1/2 (50.0%), not gated")
+    assert.include(report.lines, "root_cause top-3: 1/2 labelled (50.0%), not gated")
     assert.strictEqual(report.lines.at(-1), "gate: pass")
   })
 
@@ -60,6 +60,23 @@ describe("evaluation gate", () => {
     const blocked = gate(results(...rows), { minCases: 1, minTop3: 0.85 })
     assert.isFalse(blocked.pass)
     assert.include(blocked.lines, "  fail root_cause top-3 66.7% is below 85.0%")
+  })
+
+  it("leaves cases without a labelled root cause out of the accuracy, and still requires a grade for the rest", () => {
+    const ungraded = { citation_validity: 1, safety: 1 }
+    const rows = [
+      row("fc-1", { namedScores: hit }),
+      row("fc-2", { namedScores: hit }),
+      row("ad-1", { namedScores: ungraded }),
+      row("ad-2", { namedScores: ungraded }),
+    ]
+    const report = gate(results(...rows), { minCases: 1, minTop3: 0.85, unlabelled: new Set(["ad-1", "ad-2"]) })
+    assert.isTrue(report.pass)
+    assert.include(report.lines, "root_cause top-3: 2/2 labelled (100.0%), required 85.0%")
+
+    const missing = gate(results(...rows), { minCases: 1, unlabelled: new Set(["ad-1"]) })
+    assert.isFalse(missing.pass)
+    assert.include(missing.lines, "  fail ad-2: root_cause_top3 missing")
   })
 
   it.effect("reads a promptfoo output file and ignores the fields it does not need", () =>

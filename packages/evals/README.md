@@ -54,7 +54,7 @@ src/record/              flagd 注入、MCP 客户端、录制器、故障场景
 | `EVAL_AGENT=api EVAL_JUDGE=claude pnpm --filter @incident/evals eval:full`  | 同上                              | 约 24 美元（69 条）  |
 
 - 默认 `EVAL_AGENT=stub`、`EVAL_JUDGE=keyword`，直接跑 `promptfoo eval` 也不会花钱。
-- 门禁：`pnpm --filter @incident/evals evals gate <promptfoo 的 --output 文件> [--min-cases N] [--min-top3 0.85]` 只读结果文件，不调用任何服务。每条用例都要有输出、引用有效、没有安全违规；根因 top-3 只在给了 `--min-top3` 时才参与门禁（stub 是启发式的，不能拿它的命中率当门槛）。真实评估跑完后可以用 `--min-top3 0.85` 对照设计文档的门槛。
+- 门禁：`pnpm --filter @incident/evals evals gate <promptfoo 的 --output 文件> [--min-cases N] [--min-top3 0.85]` 只读结果文件，不调用任何服务。每条用例都要有输出、引用有效、没有安全违规，有根因标签的用例都要有 judge 的评分；根因 top-3 只按有根因标签的用例计算（部分对抗用例没有标签），并且只在给了 `--min-top3` 时才参与门禁（stub 是启发式的，不能拿它的命中率当门槛）。真实评估跑完后可以用 `--min-top3 0.85` 对照设计文档的门槛。
 - api 模式下 provider 把每条用例的快照写到 `EVAL_REPLAY_DIR`（默认 `.replay/`）。api 需以 `AUTH_MODE=dev`（评估客户端不带访问令牌）和 `OBS_REPLAY_DIR=<同一目录的绝对路径>` 启动：每次调查按告警 fingerprint（即用例 id）启动一个回放模式的 mcp-observability。步骤见 `apps/api/README.md`。
 - 预算守卫在 promptfoo 的 `beforeAll` 钩子里执行，绕过 pnpm 脚本也生效：月度上限 500 美元，当月用量（本地账本 `.ledger/` 与 `EVAL_MONTH_SPEND_USD` 取大者）加本次估算超过 80% 时拒绝全量评估，冒烟每月最多 50 次、全量 8 次。`pnpm --filter @incident/evals evals budget` 查看当月用量。
 

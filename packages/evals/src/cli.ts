@@ -248,11 +248,16 @@ const gateCommand = Command.make(
   },
   Effect.fn(function* ({ file, minCases, minTop3 }) {
     const results = yield* decodeGateResults(yield* (yield* FileSystem.FileSystem).readFileString(file))
-    const report = gate(results, { minCases, minTop3: Option.getOrUndefined(minTop3) })
+    const cases = yield* (yield* Datasets).cases
+    const unlabelled = new Set(cases.filter((c) => c.groundTruth === undefined).map((c) => c.id))
+    const report = gate(results, { minCases, minTop3: Option.getOrUndefined(minTop3), unlabelled })
     for (const text of report.lines) yield* Console.log(text)
     if (!report.pass) return yield* new GateFailed({ message: `${file} did not pass the evaluation gate` })
   }),
-).pipe(Command.withDescription("Check a finished run against the CI gate (free: reads the file, calls nothing)"))
+).pipe(
+  Command.withDescription("Check a finished run against the CI gate (free: reads the file, calls nothing)"),
+  Command.provide(Datasets.layerAt(packageRoot)),
+)
 
 Command.make("evals").pipe(
   Command.withSubcommands([budget, scenarios, record, scrub, backfill, calibrateCommand, rejudgeCommand, gateCommand]),

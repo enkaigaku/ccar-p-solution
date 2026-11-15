@@ -31,6 +31,11 @@ export interface GateOptions {
   readonly minCases: number
   /** Share of cases whose root cause must be in the top 3. Leave out for stub runs: the stub is a heuristic. */
   readonly minTop3?: number | undefined
+  /**
+   * Ids of the cases that carry no labelled root cause (some adversarial cases). The judge does not grade them,
+   * so they report no root-cause score and stay out of the accuracy denominator.
+   */
+  readonly unlabelled?: ReadonlySet<string> | undefined
 }
 
 export interface GateReport {
@@ -45,8 +50,9 @@ const share = (part: number, whole: number) => (whole === 0 ? "n/a" : `${((part 
 
 /**
  * Decides whether a finished evaluation may pass CI. Always required: every case produced an output, and every
- * case passes the citation and safety rules. Root-cause accuracy is reported, and gated only when `minTop3` is
- * given, so a free stub run still checks datasets, snapshots, scoring and the promptfoo wiring end to end.
+ * case passes the citation and safety rules, and every case with a labelled root cause was graded. Root-cause
+ * accuracy is computed over the labelled cases, and gated only when `minTop3` is given, so a free stub run still
+ * checks datasets, snapshots, scoring and the promptfoo wiring end to end.
  */
 export const gate = (results: GateResults, options: GateOptions): GateReport => {
   const rows = results.results.results
@@ -66,11 +72,15 @@ export const gate = (results: GateResults, options: GateOptions): GateReport => 
     for (const r of failed) failures.push(`${r.vars.caseId}: ${metric} ${r.namedScores?.[metric] ?? "missing"}`)
   }
 
-  const top3 = rows.filter((r) => r.namedScores?.root_cause_top3 === 1).length
+  const labelled = rows.filter((r) => !(options.unlabelled?.has(r.vars.caseId) ?? false))
+  for (const r of labelled) {
+    if (r.namedScores?.root_cause_top3 === undefined) failures.push(`${r.vars.caseId}: root_cause_top3 missing`)
+  }
+  const top3 = labelled.filter((r) => r.namedScores?.root_cause_top3 === 1).length
   const required = options.minTop3 === undefined ? "not gated" : `required ${share(options.minTop3, 1)}`
-  lines.push(`root_cause top-3: ${top3}/${rows.length} (${share(top3, rows.length)}), ${required}`)
-  if (options.minTop3 !== undefined && (rows.length === 0 || top3 / rows.length < options.minTop3)) {
-    failures.push(`root_cause top-3 ${share(top3, rows.length)} is below ${share(options.minTop3, 1)}`)
+  lines.push(`root_cause top-3: ${top3}/${labelled.length} labelled (${share(top3, labelled.length)}), ${required}`)
+  if (options.minTop3 !== undefined && (labelled.length === 0 || top3 / labelled.length < options.minTop3)) {
+    failures.push(`root_cause top-3 ${share(top3, labelled.length)} is below ${share(options.minTop3, 1)}`)
   }
 
   return {
