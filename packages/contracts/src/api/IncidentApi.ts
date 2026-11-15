@@ -3,7 +3,9 @@ import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "
 import { Alert, AlertId, AlertmanagerWebhook } from "../domain/Alert.ts"
 import { ActionProposal, Decision, ProposalId } from "../domain/Approval.ts"
 import { Principal } from "../domain/Auth.ts"
-import { Feedback, Investigation, InvestigationId } from "../domain/Investigation.ts"
+import { FeedbackRecord } from "../domain/Feedback.ts"
+import { Feedback, Investigation, InvestigationId, InvestigationStatus } from "../domain/Investigation.ts"
+import { PostmortemBody, PostmortemDecision, PostmortemDraft, PostmortemId } from "../domain/Postmortem.ts"
 import { Authentication, Forbidden } from "./Authentication.ts"
 
 export class InvestigationNotFound extends Schema.TaggedError<InvestigationNotFound>()(
@@ -28,6 +30,36 @@ export class ProposalNotPending extends Schema.TaggedError<ProposalNotPending>()
   "ProposalNotPending",
   { id: ProposalId, status: Schema.String },
   { httpApiStatus: 409 },
+) {}
+
+export class PostmortemNotFound extends Schema.TaggedError<PostmortemNotFound>()(
+  "PostmortemNotFound",
+  { investigationId: Schema.optionalKey(InvestigationId), id: Schema.optionalKey(PostmortemId) },
+  { httpApiStatus: 404 },
+) {}
+
+/** A postmortem can only be written for an investigation that has finished with a report. */
+export class InvestigationNotFinished extends Schema.TaggedError<InvestigationNotFinished>()(
+  "InvestigationNotFinished",
+  { id: InvestigationId, status: InvestigationStatus },
+  { httpApiStatus: 409 },
+) {}
+
+/** Only a `draft` can be regenerated, edited or reviewed. */
+export class PostmortemNotDraft extends Schema.TaggedError<PostmortemNotDraft>()(
+  "PostmortemNotDraft",
+  { id: PostmortemId, status: Schema.String },
+  { httpApiStatus: 409 },
+) {}
+
+/**
+ * The model could not write the draft, or the knowledge base could not take it. `reason` is a fixed word and
+ * `message` is written by the api; neither carries model output, prompt text or upstream error bodies.
+ */
+export class PostmortemUnavailable extends Schema.TaggedError<PostmortemUnavailable>()(
+  "PostmortemUnavailable",
+  { reason: Schema.Literals(["model", "refusal", "max_tokens", "output", "ingest"]), message: Schema.String },
+  { httpApiStatus: 503 },
 ) {}
 
 export class SystemApi extends HttpApiGroup.make("system", { topLevel: true }).add(
@@ -79,9 +111,58 @@ export class InvestigationsApi extends HttpApiGroup.make("investigations")
       success: HttpApiSchema.NoContent,
       error: [InvestigationNotFound, Forbidden],
     }),
+    // responder: asks the model for a postmortem draft; replaces an existing draft, never a reviewed one
+    HttpApiEndpoint.post("generatePostmortem", "/:id/postmortem", {
+      params: { id: InvestigationId },
+      success: PostmortemDraft,
+      error: [InvestigationNotFound, InvestigationNotFinished, PostmortemNotDraft, PostmortemUnavailable, Forbidden],
+    }),
+    // viewer
+    HttpApiEndpoint.get("postmortem", "/:id/postmortem", {
+      params: { id: InvestigationId },
+      success: PostmortemDraft,
+      error: [InvestigationNotFound, PostmortemNotFound, Forbidden],
+    }),
   )
   .middleware(Authentication)
   .prefix("/investigations") {}
+
+export class PostmortemsApi extends HttpApiGroup.make("postmortems")
+  .add(
+    // responder: a person corrects the model's text before review
+    HttpApiEndpoint.put("edit", "/:id", {
+      params: { id: PostmortemId },
+      payload: PostmortemBody,
+      success: PostmortemDraft,
+      error: [PostmortemNotFound, PostmortemNotDraft, Forbidden],
+    }),
+    // approver: the only way a postmortem reaches the knowledge base the agent retrieves from
+    HttpApiEndpoint.post("review", "/:id/review", {
+      params: { id: PostmortemId },
+      payload: Schema.Struct({ decision: PostmortemDecision }),
+      success: PostmortemDraft,
+      error: [PostmortemNotFound, PostmortemNotDraft, PostmortemUnavailable, Forbidden],
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/postmortems") {}
+
+export class FeedbackApi extends HttpApiGroup.make("feedback")
+  .add(
+    // viewer: stored feedback, newest first, for curating evaluation cases
+    HttpApiEndpoint.get("list", "/", {
+      query: {
+        /** `true`: only records that carry an actual root cause. */
+        hasRootCause: Schema.optionalKey(Schema.Literals(["true", "false"])),
+        /** Only records created at or after this instant. */
+        since: Schema.optionalKey(Schema.DateTimeUtcFromString),
+      },
+      success: Schema.Array(FeedbackRecord),
+      error: Forbidden,
+    }),
+  )
+  .middleware(Authentication)
+  .prefix("/feedback") {}
 
 export class ProposalsApi extends HttpApiGroup.make("proposals")
   .add(
@@ -111,4 +192,6 @@ export class IncidentApi extends HttpApi.make("incident-api")
   .add(AlertsApi)
   .add(InvestigationsApi)
   .add(ProposalsApi)
+  .add(PostmortemsApi)
+  .add(FeedbackApi)
   .annotateMerge(OpenApi.annotations({ title: "Incident Copilot API" })) {}

@@ -7,6 +7,8 @@ import {
   IncidentApi,
   type Investigation,
   InvestigationId,
+  PostmortemBody,
+  PostmortemId,
   Principal,
   ProposalId,
   Retriever,
@@ -37,7 +39,15 @@ import {
   toolUse,
 } from "./harness.ts"
 
-const makeClient = HttpApiTest.groups(IncidentApi, ["system", "session", "alerts", "investigations", "proposals"])
+const makeClient = HttpApiTest.groups(IncidentApi, [
+  "system",
+  "session",
+  "alerts",
+  "investigations",
+  "proposals",
+  "postmortems",
+  "feedback",
+])
 
 const operator = new Principal({ subject: "u-1", name: "operator", roles: ["viewer", "responder", "approver"] })
 
@@ -351,6 +361,31 @@ describe("IncidentApi", () => {
         const denied = yield* client.alerts.list().pipe(Effect.flip)
         assert.strictEqual(denied._tag, "Forbidden")
       }).pipe(Effect.provide(app.layer))
+    }),
+  )
+
+  it.effect("the postmortem and feedback endpoints check roles before they answer", () =>
+    Effect.gen(function* () {
+      const viewer = yield* testApp([], new Principal({ subject: "u-3", name: "carol", roles: ["viewer"] }))
+      yield* Effect.gen(function* () {
+        const client = yield* makeClient
+        assert.deepStrictEqual(yield* client.feedback.list({ query: {} }), [])
+        const id = PostmortemId.make("pm-1")
+        const denied = yield* Effect.all([
+          client.investigations.generatePostmortem({ params: { id: InvestigationId.make("inv-1") } }).pipe(Effect.flip),
+          client.postmortems
+            .edit({
+              params: { id },
+              payload: new PostmortemBody({ title: "t", summary: "s", symptoms: "s", rootCause: "r", mitigation: "m" }),
+            })
+            .pipe(Effect.flip),
+          client.postmortems.review({ params: { id }, payload: { decision: "publish" } }).pipe(Effect.flip),
+        ])
+        assert.deepStrictEqual(
+          denied.map((e) => e._tag),
+          ["Forbidden", "Forbidden", "Forbidden"],
+        )
+      }).pipe(Effect.provide(viewer.layer))
     }),
   )
 
