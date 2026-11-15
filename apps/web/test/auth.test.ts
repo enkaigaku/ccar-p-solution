@@ -4,7 +4,7 @@ import { TestClock } from "effect/testing"
 import { isCrossSiteWrite, proxyWithSession } from "../src/server/apiProxy.ts"
 import { OidcClient, OidcError, type Tokens } from "../src/server/auth/OidcClient.ts"
 import { Sessions } from "../src/server/auth/Sessions.ts"
-import { SESSION_COOKIE, safeReturnTo, sessionIdFrom, WebAuth } from "../src/server/auth/WebAuth.ts"
+import { LOGIN_COOKIE, SESSION_COOKIE, safeReturnTo, sessionIdFrom, WebAuth } from "../src/server/auth/WebAuth.ts"
 
 const ORIGIN = "http://localhost:3001"
 
@@ -58,9 +58,15 @@ const signIn = (auth: WebAuth["Service"], returnTo = "/investigations/inv-1") =>
     const login = yield* auth.login(get(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`))
     assert.strictEqual(login.status, 303)
     assert.strictEqual(login.headers.get("location"), "http://idp.test/authorize?state=state-1")
-    const callback = yield* auth.callback(get("/auth/callback?code=good&state=state-1"))
-    return { callback, cookie: (callback.headers.get("set-cookie") ?? "").split(";")[0] ?? "" }
+    const callback = yield* auth.callback(get("/auth/callback?code=good&state=state-1", LOGIN))
+    return { callback, cookie: (sessionCookie(callback) ?? "").split(";")[0] ?? "" }
   })
+
+/** The login cookie a browser holds after `/auth/login` with the fake provider. */
+const LOGIN = `${LOGIN_COOKIE}=state-1`
+
+const sessionCookie = (response: Response): string | undefined =>
+  response.headers.getSetCookie().find((c) => c.startsWith(`${SESSION_COOKIE}=`))
 
 const tokenOf = (auth: WebAuth["Service"], cookie: string) =>
   auth
@@ -74,7 +80,7 @@ describe("WebAuth", () => {
       const { callback, cookie } = yield* signIn(auth)
       assert.strictEqual(callback.status, 303)
       assert.strictEqual(callback.headers.get("location"), "/investigations/inv-1")
-      const setCookie = callback.headers.get("set-cookie") ?? ""
+      const setCookie = sessionCookie(callback) ?? ""
       assert.match(
         setCookie,
         new RegExp(`^${SESSION_COOKIE}=[A-Za-z0-9_-]{43}; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800$`),
@@ -89,16 +95,39 @@ describe("WebAuth", () => {
     Effect.gen(function* () {
       const { auth } = yield* fakeProvider
       yield* signIn(auth)
-      const replay = yield* auth.callback(get("/auth/callback?code=good&state=state-1"))
+      const replay = yield* auth.callback(get("/auth/callback?code=good&state=state-1", LOGIN))
       assert.strictEqual(replay.headers.get("location"), "/auth/login")
-      assert.isNull(replay.headers.get("set-cookie"))
-      const forged = yield* auth.callback(get("/auth/callback?code=good&state=other"))
-      assert.isNull(forged.headers.get("set-cookie"))
+      assert.isUndefined(sessionCookie(replay))
+      const forged = yield* auth.callback(get("/auth/callback?code=good&state=other", `${LOGIN_COOKIE}=other`))
+      assert.isUndefined(sessionCookie(forged))
 
       yield* auth.login(get("/auth/login"))
-      const refused = yield* auth.callback(get("/auth/callback?code=bad&state=state-1"))
+      const refused = yield* auth.callback(get("/auth/callback?code=bad&state=state-1", LOGIN))
       assert.strictEqual(refused.status, 401)
-      assert.isNull(refused.headers.get("set-cookie"))
+      assert.isUndefined(sessionCookie(refused))
+    }),
+  )
+
+  it.effect("a callback only completes in the browser that started the login", () =>
+    Effect.gen(function* () {
+      const { auth } = yield* fakeProvider
+      const login = yield* auth.login(get("/auth/login"))
+      assert.strictEqual(
+        login.headers.get("set-cookie"),
+        `${LOGIN_COOKIE}=state-1; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=600`,
+      )
+      // Another browser opens the callback URL: no login cookie, or one from a login of its own.
+      for (const cookie of [undefined, `${LOGIN_COOKIE}=state-2`, `${SESSION_COOKIE}=state-1`]) {
+        const elsewhere = yield* auth.callback(get("/auth/callback?code=good&state=state-1", cookie))
+        assert.strictEqual(elsewhere.headers.get("location"), "/auth/login")
+        assert.isUndefined(sessionCookie(elsewhere))
+      }
+      const empty = yield* auth.callback(get("/auth/callback?code=good", `${LOGIN_COOKIE}=`))
+      assert.isUndefined(sessionCookie(empty))
+      // The login itself is untouched and still completes where it started, which also clears the cookie.
+      const callback = yield* auth.callback(get("/auth/callback?code=good&state=state-1", LOGIN))
+      assert.isDefined(sessionCookie(callback))
+      assert.include(callback.headers.getSetCookie(), `${LOGIN_COOKIE}=; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=0`)
     }),
   )
 
@@ -107,8 +136,8 @@ describe("WebAuth", () => {
       const { auth } = yield* fakeProvider
       yield* auth.login(get("/auth/login"))
       yield* TestClock.adjust("11 minutes")
-      const late = yield* auth.callback(get("/auth/callback?code=good&state=state-1"))
-      assert.isNull(late.headers.get("set-cookie"))
+      const late = yield* auth.callback(get("/auth/callback?code=good&state=state-1", LOGIN))
+      assert.isUndefined(sessionCookie(late))
     }),
   )
 
@@ -163,9 +192,23 @@ describe("WebAuth", () => {
       "javascript:alert(1)",
       "/auth/login",
       "/a\nb",
+      // Browsers strip tabs and newlines while parsing, which would turn these into `//evil.test`.
+      "/\t/evil.test",
+      "/\r/evil.test",
+      "/\n/evil.test",
+      "/\u0000/evil.test",
+      "/ /evil.test",
+      // Dot segments that normalize to a protocol-relative URL or to the login routes.
+      "/.//evil.test",
+      "/x/..//evil.test",
+      "/x/../auth/login",
     ]) {
-      assert.strictEqual(safeReturnTo(bad), "/", String(bad))
+      assert.strictEqual(safeReturnTo(bad), "/", JSON.stringify(bad))
+      // Whatever is returned must stay on the console when a browser follows it.
+      assert.strictEqual(new URL(safeReturnTo(bad), ORIGIN).origin, ORIGIN)
     }
+    assert.strictEqual(safeReturnTo("/a/../investigations/inv-1#top"), "/investigations/inv-1#top")
+    assert.strictEqual(safeReturnTo("/?q=%09"), "/?q=%09")
   })
 
   it("reads the session id from the cookie header", () => {

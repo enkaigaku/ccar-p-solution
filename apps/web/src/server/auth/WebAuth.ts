@@ -1,33 +1,59 @@
 import { Context, DateTime, Duration, Effect, Layer, Option, type Redacted, Semaphore } from "effect"
 import { OidcClient, OidcConfig } from "./OidcClient.ts"
-import { SESSION_TTL, Sessions } from "./Sessions.ts"
+import { LOGIN_TTL, SESSION_TTL, Sessions } from "./Sessions.ts"
 
 export const SESSION_COOKIE = "incident_session"
+/**
+ * Ties a login to the browser that started it. Without it, a callback URL obtained in one browser could be
+ * opened in another, which would then be signed in as someone else (login CSRF).
+ */
+export const LOGIN_COOKIE = "incident_login"
 
 /** Tokens are refreshed this long before they expire, so a request never carries one that is about to lapse. */
 const REFRESH_MARGIN = Duration.seconds(30)
 
-/** The session id from the `Cookie` header, if any. */
-export const sessionIdFrom = (request: Request): string | undefined => {
+const cookieFrom = (request: Request, name: string): string | undefined => {
   for (const part of (request.headers.get("cookie") ?? "").split(";")) {
     const index = part.indexOf("=")
-    if (index > 0 && part.slice(0, index).trim() === SESSION_COOKIE) return part.slice(index + 1).trim()
+    if (index > 0 && part.slice(0, index).trim() === name) return part.slice(index + 1).trim()
   }
   return undefined
 }
 
-/**
- * Only same-site paths are accepted as the page to return to after login; anything else (absolute URLs,
- * `//host`, backslashes) becomes `/`, so the login flow cannot be used as an open redirect.
- */
-export const safeReturnTo = (value: string | null): string =>
-  value !== null && /^\/(?![/\\])[^\\\r\n]*$/.test(value) && !value.startsWith("/auth/") ? value : "/"
+/** The session id from the `Cookie` header, if any. */
+export const sessionIdFrom = (request: Request): string | undefined => cookieFrom(request, SESSION_COOKIE)
 
-const redirect = (location: string, cookie?: string): Response =>
-  new Response(null, {
-    status: 303,
-    headers: { location, "cache-control": "no-store", ...(cookie === undefined ? {} : { "set-cookie": cookie }) },
-  })
+/** Only used to resolve a path the way a browser would; never appears in a response. */
+const RETURN_BASE = "http://console.invalid"
+
+/** C0 controls, DEL and backslash: browsers drop or rewrite these while parsing a URL, so they are refused outright. */
+const hasUnsafeCharacter = (value: string): boolean => {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i)
+    if (code <= 0x20 || code === 0x7f || code === 0x5c) return true
+  }
+  return false
+}
+
+/**
+ * Only same-site paths are accepted as the page to return to after login; anything else becomes `/`, so the
+ * login flow cannot be used as an open redirect. The value is resolved like a browser would resolve the
+ * `Location` header and the normalized path is returned, so what is checked is what the browser will follow.
+ */
+export const safeReturnTo = (value: string | null): string => {
+  if (value === null || !value.startsWith("/") || hasUnsafeCharacter(value)) return "/"
+  if (!URL.canParse(value, RETURN_BASE)) return "/"
+  const url = new URL(value, RETURN_BASE)
+  if (url.origin !== RETURN_BASE) return "/"
+  const path = `${url.pathname}${url.search}${url.hash}`
+  return path.startsWith("//") || path.startsWith("/auth/") ? "/" : path
+}
+
+const redirect = (location: string, ...cookies: ReadonlyArray<string>): Response => {
+  const headers = new Headers({ location, "cache-control": "no-store" })
+  for (const cookie of cookies) headers.append("set-cookie", cookie)
+  return new Response(null, { status: 303, headers })
+}
 
 const message = (status: number, text: string): Response =>
   new Response(text, { status, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } })
@@ -66,6 +92,10 @@ export class WebAuth extends Context.Service<
     const cookie = (value: string, maxAgeSeconds: number) =>
       `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure ? "; Secure" : ""}`
     const clearCookie = cookie("", 0)
+    // Scoped to `/auth`: only the callback needs it. Lax, so it is sent on the provider's redirect back.
+    const loginCookie = (value: string, maxAgeSeconds: number) =>
+      `${LOGIN_COOKIE}=${value}; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure ? "; Secure" : ""}`
+    const clearLoginCookie = loginCookie("", 0)
     // One refresh at a time: parallel requests of a page would otherwise all redeem the same refresh token.
     const refreshing = yield* Semaphore.make(1)
 
@@ -102,7 +132,9 @@ export class WebAuth extends Context.Service<
         const returnTo = safeReturnTo(new URL(request.url).searchParams.get("returnTo"))
         return yield* oidc.beginLogin().pipe(
           Effect.tap(({ pending }) => sessions.rememberLogin(pending, returnTo)),
-          Effect.map(({ url }) => redirect(url.href)),
+          Effect.map(({ url, pending }) =>
+            redirect(url.href, loginCookie(pending.state, Duration.toSeconds(LOGIN_TTL))),
+          ),
           Effect.catch((error) =>
             Effect.logWarning(`Login unavailable: ${error.step} failed (${error.message})`).pipe(
               Effect.as(message(502, "无法连接身份提供方，请稍后重试")),
@@ -112,13 +144,17 @@ export class WebAuth extends Context.Service<
       }),
       callback: Effect.fn("WebAuth.callback")(function* (request) {
         const url = new URL(request.url)
-        const pending = yield* sessions.takeLogin(url.searchParams.get("state") ?? "")
+        const state = url.searchParams.get("state") ?? ""
+        // The callback must arrive in the browser that started this login; checked before the pending login
+        // is consumed, so a callback opened elsewhere neither signs that browser in nor cancels the login.
+        if (state === "" || cookieFrom(request, LOGIN_COOKIE) !== state) return redirect("/auth/login")
+        const pending = yield* sessions.takeLogin(state)
         // Unknown, expired or already used state: start over instead of trusting the callback.
-        if (Option.isNone(pending)) return redirect("/auth/login")
+        if (Option.isNone(pending)) return redirect("/auth/login", clearLoginCookie)
         return yield* oidc.exchange(url, pending.value).pipe(
           Effect.flatMap((tokens) => sessions.create(tokens)),
           Effect.map((session) =>
-            redirect(pending.value.returnTo, cookie(session.id, Duration.toSeconds(SESSION_TTL))),
+            redirect(pending.value.returnTo, cookie(session.id, Duration.toSeconds(SESSION_TTL)), clearLoginCookie),
           ),
           Effect.catch((error) =>
             Effect.logWarning(`Login failed: ${error.step} (${error.message})`).pipe(

@@ -41,7 +41,8 @@ pnpm --filter @incident/web dev      # http://localhost:3001
 
 ## 登录与角色
 
-- 未登录时任何 `/api` 请求得到 401（`Unauthorized`），页面跳到 `/auth/login?returnTo=<当前路径>`，登录后回到原页面。`returnTo` 只接受站内路径。
+- 未登录时任何 `/api` 请求得到 401（`Unauthorized`），页面跳到 `/auth/login?returnTo=<当前路径>`，登录后回到原页面。`returnTo` 只接受站内路径：按浏览器的方式解析后再检查，含控制字符、空格或反斜杠的值一律回到首页。
+- 发起登录时写入一个只在 `/auth` 下发送的 `incident_login` cookie，callback 只在带着它的浏览器里完成，别处打开的 callback 链接不会登录（防登录 CSRF）。
 - 浏览器只有一个 `HttpOnly`、`SameSite=Lax` 的会话 cookie（`incident_session`），令牌留在 web 服务端。访问令牌快过期时由代理用 refresh token 续期；续期被拒绝或会话满 8 小时则会话结束。
 - 顶栏显示用户名和角色。没有 responder 角色时「发起调查」置灰、反馈表单不显示；没有 approver 角色时审批单只读。这些只是界面上的提示，真正的校验在 api。
 - 审批单在处理后显示审批人。
