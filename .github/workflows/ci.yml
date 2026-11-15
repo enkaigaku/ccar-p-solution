@@ -26,3 +26,75 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+
+  # 检索评估（不花钱）：离线嵌入 + 真实的 pgvector，对种子检索集跑门禁（recall@8 ≥ 0.85）。
+  # 只能发现切块、全文检索、融合和 SQL 的回退；真实质量以 Voyage 的结果为准，见 packages/rag/README.md。
+  retrieval-eval:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg17
+        env:
+          POSTGRES_USER: incident
+          POSTGRES_PASSWORD: incident
+          POSTGRES_DB: incident
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U incident"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # 只用于本次作业里的临时容器，与 infra/compose.yaml 的本地开发库相同，不是密钥。
+      DATABASE_URL: postgres://incident:incident@localhost:5432/incident
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Postgres 集成测试
+        run: pnpm --filter @incident/rag test
+        env:
+          RAG_TEST_DATABASE_URL: ${{ env.DATABASE_URL }}
+      - name: 入库并评估（门禁不过则失败）
+        run: pnpm --filter @incident/rag rag ingest --offline | tee "$RUNNER_TEMP/retrieval.txt"
+        shell: bash -o pipefail {0}
+      - name: 摘要
+        if: always()
+        run: |
+          {
+            echo "### 检索评估（离线嵌入）"
+            echo '```'
+            cat "$RUNNER_TEMP/retrieval.txt" 2>/dev/null || echo "没有输出"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # 冒烟评估（不花钱）：stub agent + 关键词 judge 跑 10 条冒烟用例，检查数据集、快照、评分和
+  # promptfoo 接线。门禁只看「每条都有输出、引用有效、无安全违规」；根因命中率只报告，
+  # 因为 stub 是启发式的。真实 agent 的冒烟评估要花钱，不在 CI 里跑，见 packages/evals/README.md。
+  smoke-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: stub 冒烟评估与门禁
+        run: pnpm --filter @incident/evals eval:ci | tee "$RUNNER_TEMP/smoke.txt"
+        shell: bash -o pipefail {0}
+      - name: 摘要
+        if: always()
+        run: |
+          {
+            echo "### 冒烟评估（stub agent，不调用 Claude）"
+            echo '```'
+            grep -A6 -E "^[0-9]+ cases" "$RUNNER_TEMP/smoke.txt" 2>/dev/null || echo "没有门禁输出"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -12,6 +12,7 @@
     "test": "vitest run",
     "evals": "node src/cli.ts",
     "eval:stub": "EVAL_INCLUDE_SYNTHETIC=true EVAL_MODE=smoke PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfooconfig.smoke.yaml --no-cache",
+    "eval:ci": "(EVAL_INCLUDE_SYNTHETIC=true EVAL_MODE=smoke PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfooconfig.smoke.yaml --no-cache -o .results/ci-smoke.json || [ $? -eq 100 ]) && node src/cli.ts gate .results/ci-smoke.json --min-cases 10",
     "eval:smoke": "EVAL_MODE=smoke PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfooconfig.smoke.yaml --no-cache",
     "eval:full": "EVAL_MODE=full PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c promptfooconfig.full.yaml --no-cache",
     "record": "node src/cli.ts record"

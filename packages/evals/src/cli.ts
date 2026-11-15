@@ -14,6 +14,7 @@ import { faultsOf, recordBatch } from "./record/Recorder.ts"
 import { Scenarios } from "./record/scenarios.ts"
 import { scrubCalls } from "./record/scrub.ts"
 import { recordedScenarioNames, selectScenarios } from "./record/selection.ts"
+import { decodeGateResults, GateFailed, gate } from "./report/gate.ts"
 import { decodeResults, rejudge, renderSummary, summarize } from "./report/rejudge.ts"
 
 const repoRoot = new URL("../../../", import.meta.url).pathname
@@ -235,8 +236,31 @@ const rejudgeCommand = Command.make(
   Command.provide(Layer.mergeAll(BudgetGuard.layer, Datasets.layerAt(packageRoot))),
 )
 
+const gateCommand = Command.make(
+  "gate",
+  {
+    file: Argument.String("results").pipe(Argument.withDescription("A promptfoo --output JSON file of a finished run")),
+    minCases: Flag.Int("min-cases").pipe(Flag.withDescription("Fail when fewer cases ran"), Flag.withDefault(1)),
+    minTop3: Flag.Finite("min-top3").pipe(
+      Flag.withDescription("Required share of cases with the root cause in the top 3, e.g. 0.85; omit for stub runs"),
+      Flag.optional,
+    ),
+  },
+  Effect.fn(function* ({ file, minCases, minTop3 }) {
+    const results = yield* decodeGateResults(yield* (yield* FileSystem.FileSystem).readFileString(file))
+    const cases = yield* (yield* Datasets).cases
+    const unlabelled = new Set(cases.filter((c) => c.groundTruth === undefined).map((c) => c.id))
+    const report = gate(results, { minCases, minTop3: Option.getOrUndefined(minTop3), unlabelled })
+    for (const text of report.lines) yield* Console.log(text)
+    if (!report.pass) return yield* new GateFailed({ message: `${file} did not pass the evaluation gate` })
+  }),
+).pipe(
+  Command.withDescription("Check a finished run against the CI gate (free: reads the file, calls nothing)"),
+  Command.provide(Datasets.layerAt(packageRoot)),
+)
+
 Command.make("evals").pipe(
-  Command.withSubcommands([budget, scenarios, record, scrub, backfill, calibrateCommand, rejudgeCommand]),
+  Command.withSubcommands([budget, scenarios, record, scrub, backfill, calibrateCommand, rejudgeCommand, gateCommand]),
   Command.run({ version: "0.0.0" }),
   Effect.provide(NodeServices.layer),
   NodeRuntime.runMain,
