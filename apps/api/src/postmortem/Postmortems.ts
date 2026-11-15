@@ -312,7 +312,15 @@ export class Postmortems extends Context.Service<
 
       const edit = Effect.fn("Postmortems.edit")(function* (id: PostmortemId, body: PostmortemBody) {
         const draft = yield* requireDraft(id)
-        const edited = new PostmortemDraft({ ...draft, body, edited: true, updatedAt: yield* DateTime.now })
+        // An id names one revision of the text. An edit gets a new one, so a review sent from a page that still
+        // shows the old text finds no such draft instead of publishing words the approver never read.
+        const edited = new PostmortemDraft({
+          ...draft,
+          id: PostmortemId.make(crypto.randomUUID()),
+          body,
+          edited: true,
+          updatedAt: yield* DateTime.now,
+        })
         yield* store.put(edited)
         return edited
       }, lock.withPermits(1))
@@ -328,8 +336,9 @@ export class Postmortems extends Context.Service<
               ),
             ),
           )
-        // The file first: it is what a full index rebuild reads, and writing it twice is harmless. An ingest
-        // that fails leaves a file a retry overwrites, never an indexed document without a file.
+        // The file first, so there is never an indexed document without the file a full rebuild reads. The corpus
+        // directory must hold published postmortems only (`rag ingest --also` reads every file in it), so a failed
+        // ingest takes the file away again: the draft may still be edited, regenerated or rejected.
         const file = path.join(corpusDir, ...sourceId.split("/"))
         yield* fs
           .makeDirectory(path.dirname(file), { recursive: true })
@@ -346,7 +355,19 @@ export class Postmortems extends Context.Service<
               ...(SAFE_SERVICE.test(draft.service) ? { service: draft.service } : {}),
             }),
           ])
-          .pipe(Effect.catch(unavailable("add the postmortem to the knowledge base")))
+          .pipe(
+            Effect.tapError(() =>
+              fs.remove(file, { force: true }).pipe(
+                Effect.catch((error) =>
+                  Effect.logError("Unpublished postmortem file could not be removed; delete it by hand", {
+                    sourceId,
+                    error: error.message,
+                  }),
+                ),
+              ),
+            ),
+            Effect.catch(unavailable("add the postmortem to the knowledge base")),
+          )
         return { sourceId, indexVersion: report.indexVersion }
       })
 

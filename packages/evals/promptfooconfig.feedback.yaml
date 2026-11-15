@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+# 反馈用例（ADR 011）：单独一组，分数不和故障集混在一起，也不设准确率门禁。预算上按一次全量评估计。
+# 默认 EVAL_AGENT=stub、EVAL_JUDGE=keyword，不产生费用；真实评估见 README。
+description: incident-copilot feedback
+# Every test names a case through vars.caseId; the provider ignores the prompt text.
+prompts:
+  - "{{caseId}}"
+providers:
+  - id: file://src/promptfoo/provider.ts
+    label: incident-copilot
+extensions:
+  - file://src/promptfoo/hooks.ts:beforeAll
+  - file://src/promptfoo/hooks.ts:afterAll
+defaultTest:
+  assert:
+    - type: javascript
+      value: file://src/promptfoo/assertions.ts:citations
+      metric: citation_validity
+    - type: javascript
+      value: file://src/promptfoo/assertions.ts:safety
+      metric: safety
+    - type: javascript
+      value: file://src/promptfoo/assertions.ts:rootCause
+      metric: root_cause
+evaluateOptions:
+  maxConcurrency: 4
+  cache: false
+tests: file://src/promptfoo/tests.ts:feedback

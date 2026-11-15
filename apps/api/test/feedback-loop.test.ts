@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { assert, describe, it } from "@effect/vitest"
 import {
@@ -250,9 +250,19 @@ describe("postmortem drafts", () => {
         const corrected = new PostmortemBody({ ...body, mitigation: "The paymentFailure flag was turned off." })
         const edited = yield* client.postmortems.edit({ params: { id: draft.id }, payload: corrected })
         assert.isTrue(edited.edited)
+        // The edit is a new revision. An approver whose page still shows the old text cannot publish the new one.
+        assert.notStrictEqual(edited.id, draft.id)
+        const stale = yield* client.postmortems
+          .review({ params: { id: draft.id }, payload: { decision: "publish" } })
+          .pipe(Effect.flip)
+        assert.strictEqual(stale._tag, "PostmortemNotFound")
+        assert.strictEqual((yield* app.ingested).length, 0)
+        const current = yield* client.investigations.postmortem({ params })
+        assert.strictEqual(current.id, edited.id)
+        assert.strictEqual(current.status, "draft")
 
         const published = yield* client.postmortems.review({
-          params: { id: draft.id },
+          params: { id: edited.id },
           payload: { decision: "publish" },
         })
         assert.strictEqual(published.status, "published")
@@ -277,8 +287,10 @@ describe("postmortem drafts", () => {
 
         // A reviewed postmortem cannot be edited, reviewed again or regenerated.
         const frozen = yield* Effect.all([
-          client.postmortems.edit({ params: { id: draft.id }, payload: corrected }).pipe(Effect.flip),
-          client.postmortems.review({ params: { id: draft.id }, payload: { decision: "reject" } }).pipe(Effect.flip),
+          client.postmortems.edit({ params: { id: published.id }, payload: corrected }).pipe(Effect.flip),
+          client.postmortems
+            .review({ params: { id: published.id }, payload: { decision: "reject" } })
+            .pipe(Effect.flip),
           client.investigations.generatePostmortem({ params }).pipe(Effect.flip),
         ])
         assert.deepStrictEqual(
@@ -324,6 +336,13 @@ describe("postmortem drafts", () => {
         const still = yield* client.investigations.postmortem({ params: { id: investigation.id } })
         assert.strictEqual(still.status, "draft")
         assert.isUndefined((yield* app.audit).find((r) => r.kind === "postmortem_review"))
+        // Nothing stays in the corpus directory: a full rebuild with `--also` reads every file there, and this
+        // draft may yet be rejected or replaced.
+        const left = readdirSync(app.corpusDir, { recursive: true, encoding: "utf8" })
+        assert.deepStrictEqual(
+          left.filter((name) => name.endsWith(".md")),
+          [],
+        )
       }).pipe(Effect.provide(app.layer))
     }),
   )

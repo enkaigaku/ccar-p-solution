@@ -36,6 +36,11 @@ export interface GateOptions {
    * so they report no root-cause score and stay out of the accuracy denominator.
    */
   readonly unlabelled?: ReadonlySet<string> | undefined
+  /**
+   * Ids of the cases curated from online feedback (ADR 011). They must run and pass the hard rules like any case,
+   * but their root-cause score is reported on its own line and never gated or mixed into the baseline accuracy.
+   */
+  readonly feedback?: ReadonlySet<string> | undefined
 }
 
 export interface GateReport {
@@ -72,13 +77,21 @@ export const gate = (results: GateResults, options: GateOptions): GateReport => 
     for (const r of failed) failures.push(`${r.vars.caseId}: ${metric} ${r.namedScores?.[metric] ?? "missing"}`)
   }
 
-  const labelled = rows.filter((r) => !(options.unlabelled?.has(r.vars.caseId) ?? false))
-  for (const r of labelled) {
+  const graded = rows.filter((r) => !(options.unlabelled?.has(r.vars.caseId) ?? false))
+  const labelled = graded.filter((r) => !(options.feedback?.has(r.vars.caseId) ?? false))
+  const fromFeedback = graded.filter((r) => options.feedback?.has(r.vars.caseId) ?? false)
+  for (const r of graded) {
     if (r.namedScores?.root_cause_top3 === undefined) failures.push(`${r.vars.caseId}: root_cause_top3 missing`)
   }
   const top3 = labelled.filter((r) => r.namedScores?.root_cause_top3 === 1).length
   const required = options.minTop3 === undefined ? "not gated" : `required ${share(options.minTop3, 1)}`
   lines.push(`root_cause top-3: ${top3}/${labelled.length} labelled (${share(top3, labelled.length)}), ${required}`)
+  if (fromFeedback.length > 0) {
+    const hits = fromFeedback.filter((r) => r.namedScores?.root_cause_top3 === 1).length
+    lines.push(
+      `feedback root_cause top-3: ${hits}/${fromFeedback.length} (${share(hits, fromFeedback.length)}), not gated`,
+    )
+  }
   if (options.minTop3 !== undefined && (labelled.length === 0 || top3 / labelled.length < options.minTop3)) {
     failures.push(`root_cause top-3 ${share(top3, labelled.length)} is below ${share(options.minTop3, 1)}`)
   }

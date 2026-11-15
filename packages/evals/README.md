@@ -123,6 +123,8 @@ pnpm --filter @incident/evals evals promote <id>   # 复核后移入 datasets/fe
 
 `curate` 取带「实际根因」的反馈（api 的 `GET /feedback`，或 `--feedback <file>`）和 api 审计日志里的 `tool_call` 记录，每个调查生成一个候选：快照是 agent 当时的工具调用，标准答案是响应者写的根因。已经在数据集或候选目录里的调查会跳过，可以每周对同一份输入重复跑。
 
+反馈用例是单独的一组：`eval:smoke` / `eval:full` 不选它们，用 `pnpm --filter @incident/evals eval:feedback` 单独跑（预算上按一次全量评估计）。`rejudge` 的汇总和 `gate` 把它们单列一行，不计入故障集的准确率，也不设准确率门禁；引用和安全规则照常要求 100%。
+
 这类用例和故障集不是同一种测量：快照只有 agent 当时问过的查询，prompt 改了以后换一种问法会拿到空结果。把它们上的回退当成线索去看，不要和故障集的分数混在一起比较。全量评估会包含它们（`synthetic: false`），冒烟评估不会（`smoke: false`）。
 
 ## 尚未打通的部分

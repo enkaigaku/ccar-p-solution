@@ -6,7 +6,7 @@ const messages: Record<string, (error: object) => string> = {
   ProposalNotFound: () => "找不到这张审批单",
   ProposalNotPending: (e) =>
     Predicate.hasProperty(e, "status") ? `审批单已经处理过（当前状态：${String(e.status)}）` : "审批单已经处理过",
-  PostmortemNotFound: () => "找不到这篇复盘（可能已被重新生成，请刷新页面）",
+  PostmortemNotFound: () => "找不到这篇复盘（可能已被别人修改或重新生成，请刷新页面后再操作）",
   PostmortemNotDraft: (e) =>
     Predicate.hasProperty(e, "status")
       ? `复盘已经审核过，不能再修改（当前状态：${String(e.status)}）`

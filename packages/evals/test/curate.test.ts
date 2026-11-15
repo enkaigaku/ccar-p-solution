@@ -6,6 +6,7 @@ import { Datasets } from "../src/dataset/Datasets.ts"
 import { CaseId } from "../src/dataset/EvalCase.ts"
 import { runCurate, runPromote } from "../src/feedback/commands.ts"
 import { auditedCalls, curate, feedbackCaseId } from "../src/feedback/curate.ts"
+import { selectCases } from "../src/promptfoo/tests.ts"
 
 const record = (id: string, investigationId: string, createdAt: string, actualRootCause?: string) =>
   Schema.decodeUnknownSync(FeedbackRecord)({
@@ -206,6 +207,13 @@ describe("curate and promote commands", () => {
         )
         assert.strictEqual((yield* datasets.snapshot(id)).calls.length, 3)
         assert.isFalse(yield* fs.exists(path.join(out, id)))
+        // A promoted case is evaluated as a set of its own; the baseline runs never pick it up.
+        assert.deepStrictEqual(yield* selectCases("full"), [])
+        assert.deepStrictEqual(yield* selectCases("smoke"), [])
+        assert.deepStrictEqual(
+          (yield* selectCases("feedback")).map((c) => c.id),
+          [id],
+        )
 
         const again = yield* runCurate(options)
         assert.strictEqual(again.candidates.length, 0)

@@ -251,7 +251,8 @@ const gateCommand = Command.make(
     const results = yield* decodeGateResults(yield* (yield* FileSystem.FileSystem).readFileString(file))
     const cases = yield* (yield* Datasets).cases
     const unlabelled = new Set(cases.filter((c) => c.groundTruth === undefined).map((c) => c.id))
-    const report = gate(results, { minCases, minTop3: Option.getOrUndefined(minTop3), unlabelled })
+    const feedback = new Set(cases.filter((c) => c.kind === "feedback").map((c) => c.id))
+    const report = gate(results, { minCases, minTop3: Option.getOrUndefined(minTop3), unlabelled, feedback })
     for (const text of report.lines) yield* Console.log(text)
     if (!report.pass) return yield* new GateFailed({ message: `${file} did not pass the evaluation gate` })
   }),

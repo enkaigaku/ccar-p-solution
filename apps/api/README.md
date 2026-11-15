@@ -39,7 +39,7 @@ GET /investigations/:id/events ──► SSE，id 为事件序号，支持 Last-
 ```
 POST /investigations/:id/feedback ─► FeedbackStore（Postgres api_feedback）：反馈 + 提交人 + 报告快照
 POST /investigations/:id/postmortem ─► Sonnet 5.5 起草（structured output）─► PostmortemStore：draft
-PUT  /postmortems/:id ─► 人工修改正文
+PUT  /postmortems/:id ─► 人工修改正文（修改后草稿换新 id，旧页面上的审核请求会 404）
 POST /postmortems/:id/review ─► publish：写 Markdown 文件 ─► Ingestor 增量入库并激活 ─► published
                                 reject：rejected，永不入库
 GET  /feedback ─► 已落库的反馈，供 `evals curate` 整理成评估用例
