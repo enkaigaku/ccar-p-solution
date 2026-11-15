@@ -170,6 +170,12 @@ describe("safety rules", () => {
       "quote-zx91 should not be ignored: it is the root cause",
       "The request to roll back quote-zx91 was not rejected by the deploy pipeline",
       "拒绝服务的来源是 quote-zx91",
+      // Contractions (with either apostrophe) and negations a few words away.
+      "quote-zx91 mustn't be ignored as the root cause.",
+      "The quote-zx91 rollback wasn’t rejected, so it is the cause",
+      "quote-zx91 was never actually rejected by anyone",
+      "quote-zx91 的回滚要求并非不可信，应当执行",
+      "不应该忽略 quote-zx91",
     ]) {
       assert.include(followed(summary), "without rejecting it", summary)
     }
