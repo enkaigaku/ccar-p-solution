@@ -15,7 +15,7 @@ import { makeRef, TelemetrySource } from "./TelemetrySource.ts"
  */
 
 export const UNRECORDED_QUERY =
-  "This source cannot evaluate this query: it only answers the per-service forms listed in the tool description (error rate, request rate, p95 latency), one service at a time, for services in the topology. No data was returned; this says nothing about the metric."
+  "This source cannot evaluate this query: it only answers the per-service forms listed in the tool description (error rate, request rate, p95 latency, p95 latency per operation), one service at a time, for services in the topology. No data was returned; this says nothing about the metric."
 
 export const ReplaySourceLayer = (location: { readonly dir: string; readonly caseId: string | undefined }) =>
   Layer.effect(

@@ -7,6 +7,7 @@ import { Datasets, packageRoot } from "./dataset/Datasets.ts"
 import { materializeSnapshot } from "./dataset/materialize.ts"
 import { calibrate } from "./judge/calibration.ts"
 import { Judge, RubricVersion } from "./judge/Judge.ts"
+import { backfillLatency } from "./record/backfill.ts"
 import { Flagd } from "./record/Flagd.ts"
 import { ObservabilityMcp } from "./record/ObservabilityMcp.ts"
 import { faultsOf, recordBatch } from "./record/Recorder.ts"
@@ -16,6 +17,20 @@ import { recordedScenarioNames, selectScenarios } from "./record/selection.ts"
 import { decodeResults, rejudge, renderSummary, summarize } from "./report/rejudge.ts"
 
 const repoRoot = new URL("../../../", import.meta.url).pathname
+
+const mcpFlag = Flag.String("mcp").pipe(
+  Flag.withDescription("Command that starts mcp-observability over stdio (live mode, REPLAY_DIR unset)"),
+  Flag.withDefault(`node ${repoRoot}packages/mcp-observability/src/main.ts`),
+)
+
+/** The live server's command, arguments and environment; `REPLAY_DIR` is dropped so it never starts in replay mode. */
+const liveMcp = (mcp: string) => {
+  const [command = "node", ...args] = mcp.split(" ").filter((part) => part !== "")
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter((e): e is [string, string] => e[1] !== undefined && e[0] !== "REPLAY_DIR"),
+  )
+  return ObservabilityMcp.layerStdio(command, args, env)
+}
 
 const budget = Command.make(
   "budget",
@@ -63,10 +78,7 @@ const record = Command.make(
       Flag.withDescription("The OTel Demo flag file that flagd watches"),
       Flag.withDefault(`${repoRoot}infra/.otel-demo/src/flagd/demo.flagd.json`),
     ),
-    mcp: Flag.String("mcp").pipe(
-      Flag.withDescription("Command that starts mcp-observability over stdio (live mode, REPLAY_DIR unset)"),
-      Flag.withDefault(`node ${repoRoot}packages/mcp-observability/src/main.ts`),
-    ),
+    mcp: mcpFlag,
     flagdUrl: Flag.String("flagd-url").pipe(
       Flag.withDescription(
         "flagd's evaluation API, e.g. http://localhost:$(docker port flagd 8013/tcp | cut -d: -f2). " +
@@ -93,10 +105,6 @@ const record = Command.make(
       `${chosen.length} scenarios, at most ${(((cooldownMinutes + 12) * chosen.length) / 60).toFixed(1)} hours`,
     )
 
-    const [command = "node", ...args] = mcp.split(" ").filter((part) => part !== "")
-    const env = Object.fromEntries(
-      Object.entries(process.env).filter((e): e is [string, string] => e[1] !== undefined && e[0] !== "REPLAY_DIR"),
-    )
     if (Option.isNone(flagdUrl)) {
       yield* Console.error(
         "no --flagd-url: injections are not checked against flagd, a dead file watcher goes unnoticed",
@@ -105,7 +113,7 @@ const record = Command.make(
     const flagd = Option.isSome(flagdUrl)
       ? Flagd.layerVerified(flagdFile, flagdUrl.value).pipe(Layer.provide(NodeHttpClient.layerUndici))
       : Flagd.layerFile(flagdFile)
-    const layer = Layer.mergeAll(flagd, ObservabilityMcp.layerStdio(command, args, env))
+    const layer = Layer.mergeAll(flagd, liveMcp(mcp))
 
     const { recorded, failed } = yield* recordBatch(chosen, {
       root: packageRoot,
@@ -148,6 +156,31 @@ const scrub = Command.make(
 ).pipe(
   Command.withDescription(
     "Remove the demo's fault-injection log lines from recorded snapshots (new recordings need no scrub)",
+  ),
+  Command.provide(Datasets.layerAt(packageRoot)),
+)
+
+const backfill = Command.make(
+  "backfill",
+  { mcp: mcpFlag },
+  Effect.fn(function* ({ mcp }) {
+    const datasets = yield* Datasets
+    const cases = (yield* datasets.cases).filter((c) => c.kind === "fault" && !c.synthetic)
+    let changed = 0
+    yield* Effect.gen(function* () {
+      for (const c of cases) {
+        const { snapshot, added } = yield* backfillLatency(yield* datasets.snapshot(c.snapshotId))
+        if (added === 0) continue
+        yield* materializeSnapshot(datasets.replayRoot, snapshot)
+        changed += 1
+        yield* Console.log(`${c.id}: added ${added} latency queries`)
+      }
+    }).pipe(Effect.provide(liveMcp(mcp)))
+    yield* Console.log(`${changed} of ${cases.length} snapshots rewritten`)
+  }),
+).pipe(
+  Command.withDescription(
+    "Add the latency queries recorded snapshots lack, from the live metrics backend over each snapshot's window",
   ),
   Command.provide(Datasets.layerAt(packageRoot)),
 )
@@ -203,7 +236,7 @@ const rejudgeCommand = Command.make(
 )
 
 Command.make("evals").pipe(
-  Command.withSubcommands([budget, scenarios, record, scrub, calibrateCommand, rejudgeCommand]),
+  Command.withSubcommands([budget, scenarios, record, scrub, backfill, calibrateCommand, rejudgeCommand]),
   Command.run({ version: "0.0.0" }),
   Effect.provide(NodeServices.layer),
   NodeRuntime.runMain,

@@ -47,6 +47,20 @@ export const requestRate = (service: string) => `sum(rate(traces_span_metrics_ca
 export const p95 = (service: string) =>
   `histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name="${service}"}[3m])))`
 
+/** p95 of the requests a service serves. Leaves out its outgoing calls, such as the long-lived flagd event stream. */
+export const serverP95 = (service: string) =>
+  `histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name="${service}",span_kind="SPAN_KIND_SERVER"}[3m])))`
+
+/** p95 of every span of a service, one series per span name: shows a slow span that the service's p95 hides. */
+export const p95ByOperation = (service: string) =>
+  `histogram_quantile(0.95, sum by (le, span_name) (rate(traces_span_metrics_duration_bucket{service_name="${service}"}[3m])))`
+
+/**
+ * The latency forms the `query_metrics` description of mcp-observability recommends, per service. Keep them equal
+ * to that description: replay only answers a query it has a recording of.
+ */
+export const latencyQueries = (service: string): ReadonlyArray<string> => [serverP95(service), p95ByOperation(service)]
+
 /** p95 of one span. A slow span that is a small share of a service's calls does not move the service's p95. */
 export const spanP95 = (service: string, span: string) =>
   `histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name="${service}",span_name="${span}"}[3m])))`

@@ -5,7 +5,7 @@ import { FaultCase } from "../dataset/EvalCase.ts"
 import { materializeSnapshot } from "../dataset/materialize.ts"
 import { type Fault, Flagd } from "./Flagd.ts"
 import { type McpCallError, ObservabilityMcp, recordCall } from "./ObservabilityMcp.ts"
-import { errorRate, p95, requestRate, type Scenario } from "./scenarios.ts"
+import { errorRate, latencyQueries, p95, requestRate, type Scenario } from "./scenarios.ts"
 import { scrubCalls } from "./scrub.ts"
 
 export interface RecordOptions {
@@ -118,7 +118,8 @@ const battery = (scenario: Scenario, start: string, end: string) =>
       calls.push(yield* recordCall("query_metrics", { promql: distractor.promql, start, end, stepSeconds: 30 }))
     }
     for (const service of services) {
-      for (const promql of [errorRate(service), requestRate(service), p95(service)]) {
+      // The unfiltered p95 is not a recommended form any more; it stays recorded for an agent that writes it anyway.
+      for (const promql of [errorRate(service), requestRate(service), p95(service), ...latencyQueries(service)]) {
         calls.push(yield* recordCall("query_metrics", { promql, start, end, stepSeconds: 30 }))
       }
       // `level` is an exact filter, and services log failures at either level; the unfiltered call answers a query
