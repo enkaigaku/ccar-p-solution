@@ -36,7 +36,8 @@ const callService = (call: ReplaySnapshot["calls"][number]): string | undefined 
     case "get_service_topology":
       return call.input.service
     case "query_metrics":
-      return /service(?:_name)?="([^"]+)"/.exec(call.input.promql)?.[1]
+      // `client="…"` selects a service's outgoing calls in the service graph metrics.
+      return /(?:service(?:_name)?|client)="([^"]+)"/.exec(call.input.promql)?.[1]
     case "get_trace":
       return call.output.rootService
   }
@@ -54,9 +55,47 @@ export const dropServices = (snapshot: ReplaySnapshot, services: ReadonlyArray<s
   })
 }
 
+/** Removes every log, metric and trace call: what the agent sees when the telemetry backend is down. */
+export const dropAllTelemetry = (snapshot: ReplaySnapshot): ReplaySnapshot =>
+  new ReplaySnapshot({
+    ...snapshot,
+    calls: snapshot.calls.filter((call) => call.tool === "get_service_topology" || call.tool === "get_service_status"),
+  })
+
+/** Replaces the alert, keeping its timing and fingerprint. */
+export const replaceAlert = (snapshot: ReplaySnapshot, alert: NonNullable<AdversarialCase["alert"]>): ReplaySnapshot =>
+  new ReplaySnapshot({
+    ...snapshot,
+    alert: {
+      ...snapshot.alert,
+      labels: { alertname: alert.alertname, service: alert.service, severity: alert.severity },
+      annotations: { summary: alert.summary },
+    },
+  })
+
+/** Appends the payload to the alert's summary annotation. */
+export const injectIntoAlert = (snapshot: ReplaySnapshot, injection: Injection): ReplaySnapshot =>
+  new ReplaySnapshot({
+    ...snapshot,
+    alert: {
+      ...snapshot.alert,
+      annotations: {
+        ...snapshot.alert.annotations,
+        summary: `${snapshot.alert.annotations.summary ?? ""} ${injection.payload}`.trim(),
+      },
+    },
+  })
+
 export const deriveSnapshot = (base: ReplaySnapshot, c: AdversarialCase): ReplaySnapshot => {
   let snapshot = new ReplaySnapshot({ ...base, caseId: c.id })
+  if (c.dropAllTelemetry === true) snapshot = dropAllTelemetry(snapshot)
   if (c.dropServices !== undefined) snapshot = dropServices(snapshot, c.dropServices)
-  if (c.injection !== undefined) snapshot = injectIntoLogs(snapshot, c.injection)
+  if (c.alert !== undefined) snapshot = replaceAlert(snapshot, c.alert)
+  if (c.injection !== undefined) {
+    snapshot =
+      c.injection.surface === "alert-summary"
+        ? injectIntoAlert(snapshot, c.injection)
+        : injectIntoLogs(snapshot, c.injection)
+  }
   return snapshot
 }

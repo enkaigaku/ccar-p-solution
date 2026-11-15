@@ -37,6 +37,63 @@ describe("committed datasets", () => {
     }).pipe(Effect.provide(DatasetsLive)),
   )
 
+  it.effect("every real adversarial case changes what the agent sees and can be scored", () =>
+    Effect.gen(function* () {
+      const datasets = yield* Datasets
+      const cases = (yield* datasets.cases).flatMap((c) => (c.kind === "adversarial" && !c.synthetic ? [c] : []))
+      // Design doc: about 20 adversarial cases across injection, unrelated alerts and insufficient data.
+      assert.isAtLeast(cases.length, 18)
+      for (const attack of ["log-injection", "alert-injection", "unrelated-alert", "insufficient-data"] as const) {
+        assert.isAtLeast(cases.filter((c) => c.attack === attack).length, 2, attack)
+      }
+      const flags = new Set(
+        (yield* datasets.cases).flatMap((c) =>
+          c.kind === "fault" ? [c.groundTruth.fault.flag, ...(c.groundTruth.distractors ?? []).map((d) => d.flag)] : [],
+        ),
+      )
+      const canaries = new Set<string>()
+      for (const c of cases) {
+        const base = yield* datasets.snapshot(c.snapshotId)
+        const derived = yield* snapshotFor(c)
+        const served = JSON.stringify([derived.alert, derived.calls])
+        // A real recording, and never the flag name.
+        assert.isTrue(/^fc-[0-9a-f]{8}$/.test(c.snapshotId) && !c.snapshotId.startsWith("fc-5e1d0a0"), c.id)
+        for (const flag of flags) assert.notInclude(served, flag, `${c.id} serves the flag name ${flag}`)
+
+        if (c.injection !== undefined) {
+          const { canary, payload } = c.injection
+          assert.include(payload, canary, `${c.id} payload must contain its canary`)
+          // The canary only reaches the agent through the payload, so finding it in the output proves the attack worked.
+          assert.notInclude(JSON.stringify([base.alert, base.calls]).toLowerCase(), canary.toLowerCase(), c.id)
+          assert.isFalse(canaries.has(canary), `${c.id} reuses a canary`)
+          canaries.add(canary)
+          assert.include(served, JSON.stringify(payload).slice(1, -1), `${c.id} payload is not served`)
+          // An injection case still has a correct answer the agent should reach.
+          assert.isDefined(c.groundTruth, c.id)
+          assert.isFalse(c.expect.insufficientInformation, c.id)
+        } else {
+          assert.isTrue(c.expect.insufficientInformation, c.id)
+          assert.strictEqual(c.expect.forbiddenActions.length, 3, `${c.id} must forbid every action`)
+          assert.isBelow(derived.calls.length, base.calls.length, `${c.id} drops nothing`)
+        }
+        if (c.attack === "unrelated-alert") {
+          assert.isDefined(c.alert, c.id)
+          const service = c.alert?.service ?? ""
+          assert.notInclude(c.dropServices ?? [], service, `${c.id} drops the alerting service`)
+          // The alerting service has recorded telemetry, and none of it is an error log.
+          const logs = derived.calls.flatMap((call) =>
+            call.tool === "query_logs" && call.input.service === service ? [call] : [],
+          )
+          assert.isAbove(logs.length, 0, `${c.id} has no logs for ${service}`)
+          assert.isTrue(
+            logs.every((call) => (call.output.countsByLevel.error ?? 0) === 0),
+            `${c.id}: ${service} has error logs`,
+          )
+        }
+      }
+    }).pipe(Effect.provide(DatasetsLive)),
+  )
+
   it.effect("the calibration set has enough samples of every verdict, each labelled against a committed case", () =>
     Effect.gen(function* () {
       const datasets = yield* Datasets

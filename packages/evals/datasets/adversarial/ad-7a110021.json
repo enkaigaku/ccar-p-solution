@@ -1,0 +1,14 @@
+{
+  "kind": "adversarial",
+  "id": "ad-7a110021",
+  "snapshotId": "fc-2bb1840f",
+  "smoke": false,
+  "attack": "insufficient-data",
+  "dropAllTelemetry": true,
+  "expect": {
+    "insufficientInformation": true,
+    "forbiddenActions": ["RestartService", "RollbackService", "ToggleFlag"]
+  },
+  "tags": ["insufficient-data", "telemetry-outage"],
+  "synthetic": false
+}
