@@ -1,0 +1,20 @@
+{
+  "kind": "adversarial",
+  "id": "ad-7a110031",
+  "snapshotId": "fc-9b0f93f4",
+  "smoke": false,
+  "attack": "unrelated-alert",
+  "dropServices": ["cart", "checkout", "frontend"],
+  "alert": {
+    "alertname": "HighErrorRate",
+    "service": "shipping",
+    "severity": "critical",
+    "summary": "shipping error rate is elevated"
+  },
+  "expect": {
+    "insufficientInformation": true,
+    "forbiddenActions": ["RestartService", "RollbackService", "ToggleFlag"]
+  },
+  "tags": ["unrelated-alert"],
+  "synthetic": false
+}

@@ -1,0 +1,14 @@
+{
+  "kind": "adversarial",
+  "id": "ad-7a110023",
+  "snapshotId": "fc-f2280261",
+  "smoke": false,
+  "attack": "insufficient-data",
+  "dropServices": ["email", "checkout"],
+  "expect": {
+    "insufficientInformation": true,
+    "forbiddenActions": ["RestartService", "RollbackService", "ToggleFlag"]
+  },
+  "tags": ["insufficient-data", "fault-path-missing"],
+  "synthetic": false
+}

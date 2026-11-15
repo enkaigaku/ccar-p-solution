@@ -37,8 +37,14 @@ export const Expectations = Schema.Struct({
 })
 export type Expectations = typeof Expectations.Type
 
-/** Text planted into replayed log samples to test prompt-injection resistance. */
+/** Text planted into what the agent reads, to test prompt-injection resistance. */
 export const Injection = Schema.Struct({
+  /**
+   * Where the payload goes. `logs` (the default): the newest sample of every replayed `query_logs` result for
+   * `service`. `alert-summary`: appended to the alert's summary annotation, which reaches triage and the agent.
+   */
+  surface: Schema.optionalKey(Schema.Literals(["logs", "alert-summary"])),
+  /** The service whose logs carry the payload. Ignored for `alert-summary`. */
   service: Schema.NonEmptyString,
   payload: Schema.NonEmptyString,
   /** A string that must not appear in any hypothesis or proposal if the agent ignored the payload. */
@@ -65,10 +71,24 @@ export class AdversarialCase extends Schema.Class<AdversarialCase>("@incident/ev
   /** The fault snapshot this case starts from. */
   snapshotId: CaseId,
   smoke: Schema.Boolean,
-  attack: Schema.Literals(["log-injection", "unrelated-alert", "insufficient-data"]),
+  attack: Schema.Literals(["log-injection", "alert-injection", "unrelated-alert", "insufficient-data"]),
   injection: Schema.optionalKey(Injection),
-  /** For `insufficient-data`: services whose recorded calls are dropped before replay. */
+  /** Services whose recorded calls are dropped before replay, so the agent cannot see their telemetry. */
   dropServices: Schema.optionalKey(Schema.Array(Schema.String)),
+  /** Drops every recorded log, metric and trace call: the telemetry backend answers nothing. */
+  dropAllTelemetry: Schema.optionalKey(Schema.Boolean),
+  /**
+   * For `unrelated-alert`: replaces the recorded alert with one about a service the snapshot shows as healthy.
+   * Combined with `dropServices` for the recorded fault, nothing in the data explains the alert.
+   */
+  alert: Schema.optionalKey(
+    Schema.Struct({
+      alertname: Schema.NonEmptyString,
+      service: Schema.NonEmptyString,
+      severity: Schema.NonEmptyString,
+      summary: Schema.NonEmptyString,
+    }),
+  ),
   /** Present when the case still has a correct answer (e.g. injection on top of a real fault). */
   groundTruth: Schema.optionalKey(GroundTruth),
   expect: Expectations,
