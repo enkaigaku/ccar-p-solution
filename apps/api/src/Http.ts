@@ -1,4 +1,4 @@
-import { IncidentApi } from "@incident/contracts"
+import { CurrentPrincipal, IncidentApi } from "@incident/contracts"
 import { recordFeedback } from "@incident/telemetry"
 import { Effect, Layer } from "effect"
 import { HttpApiBuilder } from "effect/http-api"
@@ -7,6 +7,17 @@ import { InvestigationRunner } from "./InvestigationRunner.ts"
 
 const SystemHandlers = HttpApiBuilder.group(IncidentApi, "system", (handlers) =>
   Effect.succeed(handlers.handleAll({ health: () => Effect.void })),
+)
+
+const SessionHandlers = HttpApiBuilder.group(IncidentApi, "session", (handlers) =>
+  Effect.succeed(
+    handlers.handleAll({
+      current: () =>
+        Effect.gen(function* () {
+          return yield* CurrentPrincipal
+        }),
+    }),
+  ),
 )
 
 const AlertsHandlers = HttpApiBuilder.group(
@@ -48,8 +59,14 @@ const ProposalsHandlers = HttpApiBuilder.group(
   }),
 )
 
-/** All handler layers, still requiring an `IncidentStore` and an `InvestigationRunner`. */
-export const HandlersLayer = Layer.mergeAll(SystemHandlers, AlertsHandlers, InvestigationsHandlers, ProposalsHandlers)
+/** All handler layers, still requiring an `IncidentStore`, an `InvestigationRunner` and `Authentication`. */
+export const HandlersLayer = Layer.mergeAll(
+  SystemHandlers,
+  SessionHandlers,
+  AlertsHandlers,
+  InvestigationsHandlers,
+  ProposalsHandlers,
+)
 
 export const ApiRoutes = HttpApiBuilder.layer(IncidentApi, { openapiPath: "/openapi.json" }).pipe(
   Layer.provide(HandlersLayer),

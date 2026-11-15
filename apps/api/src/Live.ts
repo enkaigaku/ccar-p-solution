@@ -1,6 +1,6 @@
 import { NodeServices } from "@effect/platform-node"
 import { PgClient } from "@effect/sql-pg"
-import { Retriever } from "@incident/contracts"
+import { Authentication, Principal, Retriever } from "@incident/contracts"
 import { RetrieverLive } from "@incident/rag"
 import { Config, Effect, Layer, Option } from "effect"
 import { Investigator } from "./agent/Investigator.ts"
@@ -9,7 +9,7 @@ import { AuditLog } from "./audit/AuditLog.ts"
 import { ClaudeClient } from "./claude/ClaudeClient.ts"
 import { InvestigationEvents } from "./events/InvestigationEvents.ts"
 import { IncidentStore } from "./IncidentStore.ts"
-import { InvestigationRunner } from "./InvestigationRunner.ts"
+import { InvestigationRunner, RunnerConfig } from "./InvestigationRunner.ts"
 import { ObservabilityGateway } from "./mcp/ObservabilityGateway.ts"
 import { OpsGateway } from "./mcp/OpsGateway.ts"
 import { Triage } from "./triage/Triage.ts"
@@ -26,6 +26,20 @@ export const RetrieverFromEnv = Layer.unwrap(
       return Retriever.layerStub
     }
     return RetrieverLive.pipe(Layer.provide(PgClient.layer({ url: url.value })))
+  }),
+)
+
+/**
+ * Placeholder until the api verifies OIDC access tokens (design doc "认证与授权"): every request is the
+ * `APPROVER_ID` operator with all roles, which is how the api behaved before the contract had authentication.
+ */
+export const AuthenticationPlaceholder = Layer.unwrap(
+  Effect.gen(function* () {
+    const { approver } = yield* RunnerConfig
+    yield* Effect.logWarning("Requests are not authenticated; every caller acts as the configured operator")
+    return Authentication.layerStub(
+      new Principal({ subject: approver, name: approver, roles: ["viewer", "responder", "approver"] }),
+    )
   }),
 )
 

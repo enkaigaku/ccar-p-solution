@@ -1,10 +1,12 @@
 import { assert, describe, it } from "@effect/vitest"
 import {
   ActionProposal,
+  Authentication,
   Feedback,
   IncidentApi,
   type Investigation,
   InvestigationId,
+  Principal,
   ProposalId,
   Retriever,
   ToggleFlag,
@@ -34,7 +36,9 @@ import {
   toolUse,
 } from "./harness.ts"
 
-const makeClient = HttpApiTest.groups(IncidentApi, ["system", "alerts", "investigations", "proposals"])
+const makeClient = HttpApiTest.groups(IncidentApi, ["system", "session", "alerts", "investigations", "proposals"])
+
+const operator = new Principal({ subject: "u-1", name: "operator", roles: ["viewer", "responder", "approver"] })
 
 /** The whole api behind the HTTP handlers, with fake Claude replies, in-process MCP servers and the stub retriever. */
 const testApp = (replies: Array<FakeReply>) =>
@@ -60,7 +64,10 @@ const testApp = (replies: Array<FakeReply>) =>
       ),
       Layer.provideMerge(services),
     )
-    const layer = Layer.mergeAll(HandlersLayer.pipe(Layer.provideMerge(app)), HttpServer.layerServices)
+    const layer = Layer.mergeAll(
+      HandlersLayer.pipe(Layer.provideMerge(app), Layer.provideMerge(Authentication.layerStub(operator))),
+      HttpServer.layerServices,
+    )
     return { layer, requests: claude.requests, executed: ops.executed }
   })
 
@@ -242,6 +249,17 @@ describe("IncidentApi", () => {
         assert.strictEqual((yield* store.getProposal(ProposalId.make("p-stale"))).status, "expired")
         assert.deepStrictEqual(yield* app.executed, [])
       }).pipe(Effect.provide(app.layer))
+    }),
+  )
+
+  it.effect("reports the authenticated principal", () =>
+    Effect.gen(function* () {
+      const app = yield* testApp([])
+      const principal = yield* makeClient.pipe(
+        Effect.flatMap((client) => client.session.current()),
+        Effect.provide(app.layer),
+      )
+      assert.deepStrictEqual(principal, operator)
     }),
   )
 })
