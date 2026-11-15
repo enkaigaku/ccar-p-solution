@@ -1,8 +1,9 @@
 import { assert, describe, it } from "@effect/vitest"
-import { InvestigationId, StatusChanged, StepStarted } from "@incident/contracts"
-import { Effect, Fiber, Layer, Stream } from "effect"
+import { InvestigationId, Principal, StatusChanged, StepStarted, Unauthorized } from "@incident/contracts"
+import { Effect, Fiber, Layer, Redacted, Stream } from "effect"
 import { HttpRouter, HttpServer } from "effect/http"
-import { EventsRoute, parseLastEventId } from "../src/EventsRoute.ts"
+import { TokenVerifier } from "../src/auth/TokenVerifier.ts"
+import { bearerToken, EventsRoute, parseLastEventId } from "../src/EventsRoute.ts"
 import { InvestigationEvents } from "../src/events/InvestigationEvents.ts"
 import { IncidentStore } from "../src/IncidentStore.ts"
 import { webhook } from "./fixtures.ts"
@@ -55,8 +56,25 @@ describe("InvestigationEvents", () => {
   })
 })
 
+/** Maps fixed tokens to principals, like a verifier would after checking a signature. */
+const fakeVerifier = TokenVerifier.of({
+  verify: (token) => {
+    const roles = { "viewer-token": ["viewer"], "no-role-token": [] }[Redacted.value(token)]
+    return roles === undefined
+      ? Effect.fail(new Unauthorized({ message: "refused" }))
+      : Effect.succeed(new Principal({ subject: "u-1", name: "alice", roles: roles as ReadonlyArray<"viewer"> }))
+  },
+})
+
 describe("GET /investigations/:id/events", () => {
-  it.effect("serves SSE with sequence ids and 404 for unknown investigations", () =>
+  it("reads only bearer credentials from the Authorization header", () => {
+    assert.strictEqual(Redacted.value(bearerToken("Bearer abc.def")), "abc.def")
+    assert.strictEqual(Redacted.value(bearerToken("bearer   abc")), "abc")
+    assert.strictEqual(Redacted.value(bearerToken("Basic abc")), "")
+    assert.strictEqual(Redacted.value(bearerToken(undefined)), "")
+  })
+
+  it.effect("serves SSE with sequence ids to a viewer, 404 for unknown investigations, 401/403 otherwise", () =>
     Effect.gen(function* () {
       const store = yield* IncidentStore
       const events = yield* InvestigationEvents
@@ -69,6 +87,7 @@ describe("GET /investigations/:id/events", () => {
         EventsRoute.pipe(
           Layer.provide(Layer.succeed(IncidentStore, store)),
           Layer.provide(Layer.succeed(InvestigationEvents, events)),
+          Layer.provide(Layer.succeed(TokenVerifier, fakeVerifier)),
           Layer.provide(HttpServer.layerServices),
         ),
         { disableLogger: true },
@@ -76,7 +95,7 @@ describe("GET /investigations/:id/events", () => {
       const response = yield* Effect.promise(() =>
         handler(
           new Request(`http://localhost/investigations/${investigation.id}/events`, {
-            headers: { "last-event-id": "1" },
+            headers: { "last-event-id": "1", authorization: "Bearer viewer-token" },
           }),
         ),
       )
@@ -87,8 +106,20 @@ describe("GET /investigations/:id/events", () => {
       assert.notInclude(body, "id: 1\n")
       assert.include(body, '"status":"failed"')
 
-      const missing = yield* Effect.promise(() => handler(new Request("http://localhost/investigations/nope/events")))
-      assert.strictEqual(missing.status, 404)
+      const get = (id: string, authorization?: string) =>
+        Effect.promise(() =>
+          handler(
+            new Request(`http://localhost/investigations/${id}/events`, {
+              headers: authorization === undefined ? {} : { authorization },
+            }),
+          ),
+        )
+      assert.strictEqual((yield* get("nope", "Bearer viewer-token")).status, 404)
+      // Authentication comes first: an unauthenticated caller cannot probe which investigations exist.
+      assert.strictEqual((yield* get("nope")).status, 401)
+      assert.strictEqual((yield* get(investigation.id)).status, 401)
+      assert.strictEqual((yield* get(investigation.id, "Bearer wrong")).status, 401)
+      assert.strictEqual((yield* get(investigation.id, "Bearer no-role-token")).status, 403)
       yield* Effect.promise(dispose)
     }).pipe(Effect.provide(Layer.mergeAll(IncidentStore.layerMemory, InvestigationEvents.layer))),
   )

@@ -5,9 +5,11 @@ import { TelemetryLive } from "@incident/telemetry"
 import { Config, Effect, Layer } from "effect"
 import { HttpRouter } from "effect/http"
 import { HttpApiScalar } from "effect/http-api"
+import { AuthenticationLive } from "./auth/Authentication.ts"
+import { TokenVerifier } from "./auth/TokenVerifier.ts"
 import { EventsRoute } from "./EventsRoute.ts"
 import { ApiRoutes } from "./Http.ts"
-import { AppLive, AuthenticationPlaceholder } from "./Live.ts"
+import { AppLive } from "./Live.ts"
 
 const DocsRoute = HttpApiScalar.layer(IncidentApi, { path: "/docs" })
 
@@ -20,7 +22,9 @@ const ServerLayer = Layer.unwrap(
   }),
 ).pipe(
   Layer.provide(AppLive),
-  Layer.provide(AuthenticationPlaceholder),
+  // The HttpApi middleware and the SSE route share one verifier.
+  Layer.provide(AuthenticationLive),
+  Layer.provide(TokenVerifier.layer),
   // Provided last so every span, including the HTTP server spans, is exported.
   Layer.provide(TelemetryLive({ serviceName: "incident-api" })),
 )

@@ -152,6 +152,20 @@ label {
   font-weight: 600;
 }
 
+.topbar .session {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.topbar .session-user {
+  font-weight: 600;
+}
+
+.topbar .session form {
+  margin: 0;
+}
+
 .page {
   width: min(78rem, 100%);
   margin: 0 auto;

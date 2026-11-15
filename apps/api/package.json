@@ -22,7 +22,8 @@
     "@incident/rag": "workspace:*",
     "@incident/telemetry": "workspace:*",
     "@modelcontextprotocol/sdk": "1.32.2",
-    "effect": "4.1.4"
+    "effect": "4.1.4",
+    "jose": "6.2.16"
   },
   "devDependencies": {
     "@effect/vitest": "4.1.4",

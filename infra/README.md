@@ -9,7 +9,24 @@ infra/scripts/otel-demo.sh up                              # 被运维系统：O
 ```
 
 - OTel Demo 3.1.0 默认只启动核心服务和它自己的 collector，不再自带 Grafana / Prometheus。`otel-demo.sh` 用 demo 提供的 `compose.extras.yaml` 和 `otelcol-config-extras.yml` 两个扩展点（内容在 `observability/otel-demo/`）把 demo 的 collector 接到我们的网关，demo 的 trace、指标、日志与 Incident Copilot 自己的遥测进同一套后端。
-- Keycloak（OIDC）在 M2 接入审批流时加入本文件。
+
+## 登录（`keycloak/`，ADR 010）
+
+```bash
+# .env 里填 OIDC_CLIENT_SECRET、KEYCLOAK_ADMIN_PASSWORD、KEYCLOAK_DEMO_PASSWORD，并取消 OIDC_ISSUER 的注释（见 .env.example）
+docker compose --env-file .env -f infra/keycloak/compose.yaml up -d      # http://localhost:8080，约 30 秒后可用
+
+set -a; . ./.env; set +a                 # 两个终端都要执行：api 和 web 都读 OIDC_ISSUER
+pnpm dev:api                             # 终端 1：校验访问令牌
+pnpm --filter @incident/web dev          # 终端 2：http://localhost:3001，未登录时跳转到 Keycloak
+```
+
+- `keycloak/incident-realm.json` 在容器创建时导入 realm `incident`：三个角色（approver 包含 responder，responder 包含 viewer）、客户端 `incident-web`（机密客户端，授权码 + PKCE，访问令牌带 `aud=incident-api` 和 `realm_access.roles`）、三个演示用户。客户端密钥和用户密码由 compose 从 `.env` 注入，文件里没有任何凭据。
+- 演示用户：`alice`（approver）、`bob`（responder）、`carol`（viewer），密码都是 `KEYCLOAK_DEMO_PASSWORD`。
+- Keycloak 用 `start-dev`（HTTP、内嵌数据库），只适合本机演示。`down` 会丢弃 realm 和所有会话，下次 `up` 重新导入；改了 realm 文件或 `.env` 后要 `down` 再 `up`。
+- 管理控制台：<http://localhost:8080/admin>，用户 `admin`，密码 `KEYCLOAK_ADMIN_PASSWORD`。
+- web 的默认端口 3001 与下面 Grafana 的 3001 相同，两者同时运行时给 web 换一个端口，并把 `WEB_ORIGIN` 设成新地址（Keycloak 也读这个变量，改后要重建容器）。
+- 评估和不需要登录的开发用 `AUTH_MODE=dev pnpm dev:api`，不要设置 `OIDC_ISSUER`。
 
 ## 观测后端（`observability/`，ADR 008）
 
@@ -36,7 +53,7 @@ api 不在 3000 端口时，用 `INCIDENT_API_WEBHOOK_URL` 覆盖告警投递地
 
 ```bash
 docker compose -f infra/observability/compose.yaml up -d
-pnpm dev:api                                   # 默认导出到 localhost:4318
+AUTH_MODE=dev pnpm dev:api                     # 默认导出到 localhost:4318
 curl -s localhost:3000/health
 open "http://localhost:3001/explore"           # 选 Tempo，Search：service.name = incident-api
 ```

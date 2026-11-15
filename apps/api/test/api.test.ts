@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import {
   ActionProposal,
+  AlertId,
   Authentication,
   Feedback,
   IncidentApi,
@@ -41,15 +42,16 @@ const makeClient = HttpApiTest.groups(IncidentApi, ["system", "session", "alerts
 const operator = new Principal({ subject: "u-1", name: "operator", roles: ["viewer", "responder", "approver"] })
 
 /** The whole api behind the HTTP handlers, with fake Claude replies, in-process MCP servers and the stub retriever. */
-const testApp = (replies: Array<FakeReply>) =>
+const testApp = (replies: Array<FakeReply>, principal: Principal = operator) =>
   Effect.gen(function* () {
     const claude = fakeAnthropic(replies)
     const ops = yield* opsServer
+    const audit = yield* AuditLog.makeMemory
     const services = Layer.mergeAll(
       IncidentStore.layerMemory,
       InvestigationEvents.layer,
       claude.layer,
-      AuditLog.layerMemory,
+      Layer.succeed(AuditLog, audit.service),
       Retriever.layerStub,
       ObservabilityGateway.layerFrom(observabilitySession),
       Layer.succeed(OpsGateway, OpsGateway.fromSession(ops.open)),
@@ -65,10 +67,10 @@ const testApp = (replies: Array<FakeReply>) =>
       Layer.provideMerge(services),
     )
     const layer = Layer.mergeAll(
-      HandlersLayer.pipe(Layer.provideMerge(app), Layer.provideMerge(Authentication.layerStub(operator))),
+      HandlersLayer.pipe(Layer.provideMerge(app), Layer.provideMerge(Authentication.layerStub(principal))),
       HttpServer.layerServices,
     )
-    return { layer, requests: claude.requests, executed: ops.executed }
+    return { layer, requests: claude.requests, executed: ops.executed, audit: audit.records }
   })
 
 const triageReply = reply(
@@ -136,7 +138,17 @@ describe("IncidentApi", () => {
           payload: { decision: "approved" },
         })
         assert.strictEqual(decided.status, "executed")
+        assert.strictEqual(decided.decidedBy, "operator")
         assert.deepStrictEqual(yield* app.executed, ["toggle paymentFailure off"])
+        // The decision and the signed approval both name the authenticated approver, by subject.
+        const records = yield* app.audit
+        const decision = records.find((r) => r.kind === "decision")
+        assert.deepStrictEqual(JSON.parse(decision?.payload ?? "{}"), {
+          decision: "approved",
+          approver: { subject: "u-1", name: "operator" },
+        })
+        const approval = records.find((r) => r.kind === "approval")
+        assert.strictEqual(JSON.parse(approval?.payload ?? "{}").approver, "u-1")
 
         const final = yield* client.investigations.get({ params: { id: started.id } })
         assert.strictEqual(final.status, "completed")
@@ -237,6 +249,11 @@ describe("IncidentApi", () => {
           payload: { decision: "rejected" },
         })
         assert.strictEqual(rejected.status, "rejected")
+        assert.strictEqual(rejected.decidedBy, "operator")
+        assert.deepStrictEqual(
+          (yield* app.audit).map((r) => r.kind),
+          ["decision"],
+        )
         const again = yield* client.proposals
           .decide({ params: { id: ProposalId.make("p-reject") }, payload: { decision: "approved" } })
           .pipe(Effect.flip)
@@ -248,6 +265,91 @@ describe("IncidentApi", () => {
         assert.strictEqual(stale._tag, "ProposalNotPending")
         assert.strictEqual((yield* store.getProposal(ProposalId.make("p-stale"))).status, "expired")
         assert.deepStrictEqual(yield* app.executed, [])
+      }).pipe(Effect.provide(app.layer))
+    }),
+  )
+
+  const pendingProposal = Effect.gen(function* () {
+    const store = yield* IncidentStore
+    const [alertId] = yield* store.ingestWebhook(webhook)
+    const investigation = yield* store.startInvestigation(alertId ?? AlertId.make("missing"))
+    const proposal = new ActionProposal({
+      id: ProposalId.make("p-1"),
+      investigationId: investigation.id,
+      action: ToggleFlag.make({ flag: "paymentFailure", variant: "off" }),
+      rationale: "Flag enabled a failing code path",
+      expectedEffect: "checkout error rate returns below 1%",
+      rollbackPlan: "Set the flag back to its previous variant",
+      status: "pending",
+      createdAt: yield* DateTime.now,
+    })
+    yield* store.addProposal(proposal)
+    return { alertId: investigation.alertId, investigationId: investigation.id, proposal }
+  })
+
+  it.effect("a responder can investigate and give feedback but cannot decide a proposal", () =>
+    Effect.gen(function* () {
+      const responder = new Principal({ subject: "u-2", name: "bob", roles: ["viewer", "responder"] })
+      const app = yield* testApp([], responder)
+      yield* Effect.gen(function* () {
+        const client = yield* makeClient
+        const { investigationId, proposal } = yield* pendingProposal
+        yield* client.investigations.feedback({
+          params: { id: investigationId },
+          payload: new Feedback({ rating: "up" }),
+        })
+        for (const decision of ["approved", "rejected"] as const) {
+          const denied = yield* client.proposals
+            .decide({ params: { id: proposal.id }, payload: { decision } })
+            .pipe(Effect.flip)
+          assert.strictEqual(denied._tag, "Forbidden")
+          assert.strictEqual(denied._tag === "Forbidden" ? denied.required : undefined, "approver")
+        }
+        // Nothing changed and nothing reached mcp-ops or the audit trail.
+        const store = yield* IncidentStore
+        const after = yield* store.getProposal(proposal.id)
+        assert.strictEqual(after.status, "pending")
+        assert.isUndefined(after.decidedBy)
+        assert.deepStrictEqual(yield* app.executed, [])
+        assert.deepStrictEqual(yield* app.audit, [])
+      }).pipe(Effect.provide(app.layer))
+    }),
+  )
+
+  it.effect("a viewer can read but cannot start an investigation, give feedback or decide", () =>
+    Effect.gen(function* () {
+      const app = yield* testApp([], new Principal({ subject: "u-3", name: "carol", roles: ["viewer"] }))
+      yield* Effect.gen(function* () {
+        const client = yield* makeClient
+        const { alertId, investigationId, proposal } = yield* pendingProposal
+        assert.strictEqual((yield* client.alerts.list()).length, 1)
+        assert.strictEqual((yield* client.investigations.get({ params: { id: investigationId } })).id, investigationId)
+        assert.strictEqual((yield* client.investigations.proposals({ params: { id: investigationId } })).length, 1)
+        const denied = yield* Effect.all([
+          client.investigations.start({ payload: { alertId } }).pipe(Effect.flip),
+          client.investigations
+            .feedback({ params: { id: investigationId }, payload: new Feedback({ rating: "down" }) })
+            .pipe(Effect.flip),
+          client.proposals.decide({ params: { id: proposal.id }, payload: { decision: "approved" } }).pipe(Effect.flip),
+        ])
+        assert.deepStrictEqual(
+          denied.map((e) => e._tag),
+          ["Forbidden", "Forbidden", "Forbidden"],
+        )
+        assert.deepStrictEqual(yield* app.executed, [])
+      }).pipe(Effect.provide(app.layer))
+    }),
+  )
+
+  it.effect("a principal without roles can only see who they are", () =>
+    Effect.gen(function* () {
+      const nobody = new Principal({ subject: "u-4", name: "dave", roles: [] })
+      const app = yield* testApp([], nobody)
+      yield* Effect.gen(function* () {
+        const client = yield* makeClient
+        assert.deepStrictEqual(yield* client.session.current(), nobody)
+        const denied = yield* client.alerts.list().pipe(Effect.flip)
+        assert.strictEqual(denied._tag, "Forbidden")
       }).pipe(Effect.provide(app.layer))
     }),
   )

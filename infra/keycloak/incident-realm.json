@@ -1,0 +1,108 @@
+{
+  "realm": "incident",
+  "enabled": true,
+  "displayName": "Incident Copilot",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
+  "roles": {
+    "realm": [
+      { "name": "viewer", "description": "Read alerts, investigations and proposals" },
+      {
+        "name": "responder",
+        "description": "Start investigations and give feedback",
+        "composite": true,
+        "composites": { "realm": ["viewer"] }
+      },
+      {
+        "name": "approver",
+        "description": "Approve or reject proposed write actions",
+        "composite": true,
+        "composites": { "realm": ["responder", "viewer"] }
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "incident-web",
+      "name": "Incident Copilot console",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${INCIDENT_WEB_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": ["${INCIDENT_WEB_ORIGIN}/auth/callback"],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${INCIDENT_WEB_ORIGIN}/"
+      },
+      "protocolMappers": [
+        {
+          "name": "incident-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "incident-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "enabled": true,
+      "firstName": "Alice",
+      "lastName": "Approver",
+      "email": "alice@example.test",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "${INCIDENT_DEMO_PASSWORD}", "temporary": false }],
+      "realmRoles": ["approver"]
+    },
+    {
+      "username": "bob",
+      "enabled": true,
+      "firstName": "Bob",
+      "lastName": "Responder",
+      "email": "bob@example.test",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "${INCIDENT_DEMO_PASSWORD}", "temporary": false }],
+      "realmRoles": ["responder"]
+    },
+    {
+      "username": "carol",
+      "enabled": true,
+      "firstName": "Carol",
+      "lastName": "Viewer",
+      "email": "carol@example.test",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "${INCIDENT_DEMO_PASSWORD}", "temporary": false }],
+      "realmRoles": ["viewer"]
+    }
+  ]
+}

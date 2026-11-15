@@ -1,4 +1,4 @@
-import { CurrentPrincipal, IncidentApi } from "@incident/contracts"
+import { CurrentPrincipal, IncidentApi, requireRole } from "@incident/contracts"
 import { recordFeedback } from "@incident/telemetry"
 import { Effect, Layer } from "effect"
 import { HttpApiBuilder } from "effect/http-api"
@@ -27,7 +27,7 @@ const AlertsHandlers = HttpApiBuilder.group(
     const store = yield* IncidentStore
     return handlers.handleAll({
       webhook: ({ payload }) => store.ingestWebhook(payload).pipe(Effect.map((accepted) => ({ accepted }))),
-      list: () => store.listAlerts(),
+      list: () => requireRole("viewer").pipe(Effect.andThen(store.listAlerts())),
     })
   }),
 )
@@ -39,11 +39,14 @@ const InvestigationsHandlers = HttpApiBuilder.group(
     const store = yield* IncidentStore
     const runner = yield* InvestigationRunner
     return handlers.handleAll({
-      start: ({ payload }) => runner.start(payload.alertId),
-      get: ({ params }) => store.getInvestigation(params.id),
-      proposals: ({ params }) => store.listProposals(params.id),
+      start: ({ payload }) => requireRole("responder").pipe(Effect.andThen(runner.start(payload.alertId))),
+      get: ({ params }) => requireRole("viewer").pipe(Effect.andThen(store.getInvestigation(params.id))),
+      proposals: ({ params }) => requireRole("viewer").pipe(Effect.andThen(store.listProposals(params.id))),
       feedback: ({ params, payload }) =>
-        store.addFeedback(params.id, payload).pipe(Effect.tap(() => recordFeedback(payload.rating))),
+        requireRole("responder").pipe(
+          Effect.andThen(store.addFeedback(params.id, payload)),
+          Effect.tap(() => recordFeedback(payload.rating)),
+        ),
     })
   }),
 )
@@ -54,7 +57,11 @@ const ProposalsHandlers = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const runner = yield* InvestigationRunner
     return handlers.handleAll({
-      decide: ({ params, payload }) => runner.decide(params.id, payload.decision),
+      // Only an approver's decision can lead to a write action; the principal is recorded with the decision.
+      decide: ({ params, payload }) =>
+        Effect.flatMap(requireRole("approver"), (approver) =>
+          runner.decide(params.id, { decision: payload.decision, approver, comment: payload.comment }),
+        ),
     })
   }),
 )

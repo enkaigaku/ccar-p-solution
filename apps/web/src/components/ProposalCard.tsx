@@ -5,6 +5,8 @@ import type { Loaded } from "../lib/load.ts"
 
 export interface ProposalCardProps {
   readonly proposal: ActionProposal
+  /** False when the signed-in user is not an approver: the request is shown, the buttons are not. Default true. */
+  readonly canDecide?: boolean | undefined
   /** Shown above the buttons, e.g. when the report behind this proposal is low confidence. */
   readonly warning?: string | undefined
   readonly decide: (decision: Decision, comment: string | undefined) => Promise<Loaded<ActionProposal>>
@@ -16,7 +18,7 @@ export interface ProposalCardProps {
  * One approval request. Approving takes two clicks: the second one restates exactly what will run,
  * because this is the only place in the product where a human lets the system change production.
  */
-export function ProposalCard({ proposal, warning, decide, onDecided, onFailed }: ProposalCardProps) {
+export function ProposalCard({ proposal, canDecide = true, warning, decide, onDecided, onFailed }: ProposalCardProps) {
   const [comment, setComment] = useState("")
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -53,8 +55,16 @@ export function ProposalCard({ proposal, warning, decide, onDecided, onFailed }:
         <dd>{proposal.rollbackPlan}</dd>
         <dt>提议时间</dt>
         <dd>{formatTime(proposal.createdAt)}</dd>
+        {proposal.decidedBy === undefined ? null : (
+          <>
+            <dt>审批人</dt>
+            <dd>{proposal.decidedBy}</dd>
+          </>
+        )}
       </dl>
-      {pending ? (
+      {pending && !canDecide ? (
+        <p className="empty">等待审批。只有 approver 角色可以批准或拒绝。</p>
+      ) : pending ? (
         <div className="decision">
           <label>
             审批意见（可选）

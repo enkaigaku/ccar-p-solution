@@ -13,7 +13,7 @@ Incident Copilot：面向 CCAR-P 备考的端到端 Claude 解决方案，覆盖
 ```bash
 pnpm install
 pnpm check                                   # lint + typecheck + test
-pnpm dev:api                                 # http://localhost:3000/docs
+AUTH_MODE=dev pnpm dev:api                   # http://localhost:3000/docs（不认证；登录见 infra/README.md）
 docker compose -f infra/compose.yaml up -d   # Postgres + pgvector
 infra/scripts/otel-demo.sh up                # OpenTelemetry Demo（被运维系统）
 ```

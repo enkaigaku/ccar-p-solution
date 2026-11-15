@@ -8,6 +8,7 @@ import {
   type Investigation,
   type InvestigationId,
   type InvestigationStatus,
+  type Principal,
   ProposalCreated,
   ProposalId,
   type ProposalNotFound,
@@ -19,6 +20,7 @@ import { recordInvestigationOutcome, SpanName } from "@incident/telemetry"
 import { Cause, Config, Context, DateTime, Duration, Effect, FiberSet, Layer, Semaphore } from "effect"
 import { Investigator } from "./agent/Investigator.ts"
 import { ApprovalExecutor } from "./approval/ApprovalExecutor.ts"
+import { AuditLog } from "./audit/AuditLog.ts"
 import { InvestigationEvents } from "./events/InvestigationEvents.ts"
 import { IncidentStore } from "./IncidentStore.ts"
 import { Triage } from "./triage/Triage.ts"
@@ -29,12 +31,14 @@ export const RunnerConfig = Config.all({
   maxConcurrent: Config.Int("MAX_CONCURRENT_INVESTIGATIONS").pipe(Config.withDefault(2)),
   /** Hard limit for one investigation (design doc SLO: first report p95 <= 90 s). */
   timeout: Config.Duration("INVESTIGATION_TIMEOUT").pipe(Config.withDefault(Duration.minutes(5))),
-  /**
-   * Recorded as the approver in approval tokens until the console has OIDC login (Keycloak, design doc
-   * "认证与授权"). Then it becomes the signed-in approver's identity.
-   */
-  approver: Config.String("APPROVER_ID").pipe(Config.withDefault("console-operator")),
 })
+
+/** A human decision on a proposal, made by an authenticated principal holding the `approver` role. */
+export interface DecisionInput {
+  readonly decision: Decision
+  readonly approver: Principal
+  readonly comment?: string | undefined
+}
 
 /** Approval requests expire this long after the agent proposed them (design doc: 10 minutes). */
 const PROPOSAL_TTL = Duration.minutes(APPROVAL_TOKEN_MAX_TTL_MINUTES)
@@ -49,7 +53,8 @@ export class InvestigationRunner extends Context.Service<
   {
     /** Starts (or, for an alert already under investigation, returns) an investigation. Returns immediately. */
     start(alertId: AlertId): Effect.Effect<Investigation, AlertNotFound>
-    decide(id: ProposalId, decision: Decision): Effect.Effect<ActionProposal, ProposalNotFound | ProposalNotPending>
+    /** The caller must already have checked that `input.approver` holds the `approver` role. */
+    decide(id: ProposalId, input: DecisionInput): Effect.Effect<ActionProposal, ProposalNotFound | ProposalNotPending>
   }
 >()("@incident/api/InvestigationRunner") {
   static readonly layer = Layer.effect(
@@ -61,6 +66,7 @@ export class InvestigationRunner extends Context.Service<
       const triage = yield* Triage
       const investigator = yield* Investigator
       const executor = yield* ApprovalExecutor
+      const audit = yield* AuditLog
       const fibers = yield* FiberSet.make()
       const slots = yield* Semaphore.make(config.maxConcurrent)
 
@@ -163,7 +169,8 @@ export class InvestigationRunner extends Context.Service<
           yield* setStatus(id, "completed")
         }).pipe(Effect.ignore)
 
-      const decide = Effect.fn("InvestigationRunner.decide")(function* (id: ProposalId, decision: Decision) {
+      const decide = Effect.fn("InvestigationRunner.decide")(function* (id: ProposalId, input: DecisionInput) {
+        const { approver, decision } = input
         const pending = yield* store.getProposal(id)
         const now = yield* DateTime.now
         if (
@@ -174,12 +181,23 @@ export class InvestigationRunner extends Context.Service<
           yield* completeIfDecided(pending.investigationId)
           return yield* new ProposalNotPending({ id, status: "expired" })
         }
-        const decided = yield* store.decide(id, decision)
+        const decided = yield* store.decide(id, decision, approver.name)
+        // Every decision is audited with who made it, rejections included.
+        yield* audit.append({
+          kind: "decision",
+          investigationId: decided.investigationId,
+          subject: id,
+          payload: JSON.stringify({
+            decision,
+            approver: { subject: approver.subject, name: approver.name },
+            ...(input.comment === undefined ? {} : { comment: input.comment }),
+          }),
+        })
         if (decided.status !== "approved") {
           yield* completeIfDecided(decided.investigationId)
           return decided
         }
-        const outcome = yield* executor.execute(decided, config.approver).pipe(
+        const outcome = yield* executor.execute(decided, approver.subject).pipe(
           Effect.as("executed" as const),
           Effect.catch((error) =>
             Effect.logWarning("Approved action failed", error.message).pipe(Effect.as("failed" as const)),

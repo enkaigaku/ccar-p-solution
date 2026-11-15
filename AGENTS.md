@@ -32,7 +32,7 @@ pnpm lint           # Biome
 pnpm format         # Biome 自动修复
 pnpm typecheck      # TypeScript 7（tsc）
 pnpm test           # Vitest
-pnpm dev:api        # 启动 api（内存实现），http://localhost:3000/docs
+AUTH_MODE=dev pnpm dev:api   # 启动 api（内存实现、不认证），http://localhost:3000/docs；登录见 ADR 010
 ```
 
 Node.js ≥ 22.18，直接运行 `.ts` 源码（type stripping），没有构建步骤。

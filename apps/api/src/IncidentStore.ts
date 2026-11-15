@@ -62,7 +62,12 @@ export class IncidentStore extends Context.Service<
     listFeedback(id: InvestigationId): Effect.Effect<ReadonlyArray<Feedback>, InvestigationNotFound>
     addProposal(proposal: ActionProposal): Effect.Effect<void, InvestigationNotFound>
     getProposal(id: ProposalId): Effect.Effect<ActionProposal, ProposalNotFound>
-    decide(id: ProposalId, decision: Decision): Effect.Effect<ActionProposal, ProposalNotFound | ProposalNotPending>
+    /** Records a human decision on a pending proposal; `decidedBy` is the approver's display name. */
+    decide(
+      id: ProposalId,
+      decision: Decision,
+      decidedBy: string,
+    ): Effect.Effect<ActionProposal, ProposalNotFound | ProposalNotPending>
     /** Records the outcome of executing an approved proposal. */
     setProposalStatus(
       id: ProposalId,
@@ -150,11 +155,15 @@ export class IncidentStore extends Context.Service<
         return updated
       })
 
-      const decide = Effect.fn("IncidentStore.decide")(function* (id: ProposalId, decision: Decision) {
+      const decide = Effect.fn("IncidentStore.decide")(function* (
+        id: ProposalId,
+        decision: Decision,
+        decidedBy: string,
+      ) {
         const proposal = (yield* Ref.get(state)).proposals.get(id)
         if (proposal === undefined) return yield* new ProposalNotFound({ id })
         if (proposal.status !== "pending") return yield* new ProposalNotPending({ id, status: proposal.status })
-        const decided = new ActionProposal({ ...proposal, status: decision })
+        const decided = new ActionProposal({ ...proposal, status: decision, decidedBy })
         yield* Ref.update(state, (s) => ({ ...s, proposals: new Map([...s.proposals, [id, decided]]) }))
         return decided
       })

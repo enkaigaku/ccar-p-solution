@@ -4,7 +4,14 @@ import { Config, Context, DateTime, Effect, FileSystem, Layer, Path, Ref, Schema
 
 const defaultAuditLog = fileURLToPath(new URL("../../../../infra/.api-state/audit.jsonl", import.meta.url))
 
-export const AuditKind = Schema.Literals(["llm_request", "llm_response", "tool_result", "approval", "ops_result"])
+export const AuditKind = Schema.Literals([
+  "llm_request",
+  "llm_response",
+  "tool_result",
+  "decision",
+  "approval",
+  "ops_result",
+])
 export type AuditKind = typeof AuditKind.Type
 
 /**
