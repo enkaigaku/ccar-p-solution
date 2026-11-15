@@ -5,6 +5,7 @@ import { Argument, Command, Flag } from "effect/cli"
 import { BudgetGuard, BudgetPolicy } from "./budget/Budget.ts"
 import { Datasets, packageRoot } from "./dataset/Datasets.ts"
 import { materializeSnapshot } from "./dataset/materialize.ts"
+import { defaultCandidatesDir, runCurate, runPromote } from "./feedback/commands.ts"
 import { calibrate } from "./judge/calibration.ts"
 import { Judge, RubricVersion } from "./judge/Judge.ts"
 import { backfillLatency } from "./record/backfill.ts"
@@ -259,8 +260,54 @@ const gateCommand = Command.make(
   Command.provide(Datasets.layerAt(packageRoot)),
 )
 
+const candidatesFlag = Flag.String("candidates").pipe(
+  Flag.withDescription("Directory where candidates wait for review"),
+  Flag.withDefault(defaultCandidatesDir),
+)
+
+const curateCommand = Command.make(
+  "curate",
+  {
+    feedback: Flag.String("feedback").pipe(
+      Flag.withDescription("A JSON file saved from GET /feedback; omit to ask the api at EVAL_API_URL"),
+      Flag.optional,
+    ),
+    audit: Flag.String("audit").pipe(
+      Flag.withDescription("The api's audit log (JSONL)"),
+      Flag.withDefault(`${repoRoot}infra/.api-state/audit.jsonl`),
+    ),
+    candidates: candidatesFlag,
+  },
+  ({ feedback, audit, candidates }) => runCurate({ feedback, audit, out: candidates }),
+).pipe(
+  Command.withDescription(
+    "Turn stored feedback that names an actual root cause into candidate cases (free: calls no model)",
+  ),
+  Command.provide(Datasets.layerAt(packageRoot)),
+)
+
+const promoteCommand = Command.make(
+  "promote",
+  {
+    id: Argument.String("case").pipe(Argument.withDescription("A candidate's case id, as printed by `curate`")),
+    candidates: candidatesFlag,
+  },
+  ({ id, candidates }) => runPromote({ id, from: candidates, root: packageRoot }),
+).pipe(Command.withDescription("Add a reviewed candidate to the dataset (datasets/feedback, fixtures/replay)"))
+
 Command.make("evals").pipe(
-  Command.withSubcommands([budget, scenarios, record, scrub, backfill, calibrateCommand, rejudgeCommand, gateCommand]),
+  Command.withSubcommands([
+    budget,
+    scenarios,
+    record,
+    scrub,
+    backfill,
+    calibrateCommand,
+    rejudgeCommand,
+    gateCommand,
+    curateCommand,
+    promoteCommand,
+  ]),
   Command.run({ version: "0.0.0" }),
   Effect.provide(NodeServices.layer),
   NodeRuntime.runMain,

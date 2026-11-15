@@ -53,8 +53,12 @@ export class Datasets extends Context.Service<
 
         return Datasets.of({
           cases: Effect.map(
-            Effect.all([readDir("datasets/fault", EvalCase), readDir("datasets/adversarial", EvalCase)]),
-            ([fault, adversarial]) => [...fault, ...adversarial],
+            Effect.all([
+              readDir("datasets/fault", EvalCase),
+              readDir("datasets/adversarial", EvalCase),
+              readDir("datasets/feedback", EvalCase),
+            ]),
+            (groups) => groups.flat(),
           ),
           retrieval: readDir("datasets/retrieval", RetrievalCase),
           calibration: readDir("datasets/calibration", CalibrationSample),

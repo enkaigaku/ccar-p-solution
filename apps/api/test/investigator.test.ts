@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
-import { InvestigationId, Retriever } from "@incident/contracts"
-import { ConfigProvider, DateTime, Effect, Layer, Option } from "effect"
+import { InvestigationId, RecordedToolCall, Retriever } from "@incident/contracts"
+import { ConfigProvider, DateTime, Effect, Layer, Option, Schema } from "effect"
 import { type AgentSettings, AgentSettingsConfig, Investigator, isEmptyResult } from "../src/agent/Investigator.ts"
 import { AuditLog } from "../src/audit/AuditLog.ts"
 import { ObservabilityGateway } from "../src/mcp/ObservabilityGateway.ts"
@@ -123,6 +123,16 @@ describe("Investigator", () => {
       // Security rule 5: texts go to the audit trail (hashed on spans).
       assert.strictEqual(audit.filter((r) => r.kind === "tool_result").length, 3)
       assert.strictEqual(audit.filter((r) => r.kind === "llm_response").length, 4)
+      // Every observability call (the topology lookup included) is audited with its input as a
+      // `RecordedToolCall`, which is what `evals curate` builds replay snapshots from.
+      const toolCalls = audit.filter((r) => r.kind === "tool_call")
+      const calls = toolCalls.map((r) => Schema.decodeUnknownSync(Schema.fromJsonString(RecordedToolCall))(r.payload))
+      assert.deepStrictEqual(
+        calls.map((c) => c.tool),
+        ["get_service_topology", "query_logs", "query_logs"],
+      )
+      assert.deepStrictEqual(calls[1]?.input, { service: "checkout", ...window, level: "error" })
+      assert.isTrue(toolCalls.every((r) => r.investigationId !== undefined))
     }),
   )
 

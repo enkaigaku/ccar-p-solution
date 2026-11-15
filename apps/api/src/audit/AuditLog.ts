@@ -8,9 +8,11 @@ export const AuditKind = Schema.Literals([
   "llm_request",
   "llm_response",
   "tool_result",
+  "tool_call",
   "decision",
   "approval",
   "ops_result",
+  "postmortem_review",
 ])
 export type AuditKind = typeof AuditKind.Type
 

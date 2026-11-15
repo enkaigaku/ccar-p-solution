@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { AlertCategories, InvestigationPrompt, Methodologies, TriagePrompt } from "../src/index.ts"
+import { AlertCategories, InvestigationPrompt, Methodologies, PostmortemPrompt, TriagePrompt } from "../src/index.ts"
 
-const all = [TriagePrompt, InvestigationPrompt, ...AlertCategories.map((c) => Methodologies[c])]
+const all = [TriagePrompt, InvestigationPrompt, PostmortemPrompt, ...AlertCategories.map((c) => Methodologies[c])]
 
 describe("prompts", () => {
   it("has a methodology for every triage category", () => {
@@ -22,8 +22,9 @@ describe("prompts", () => {
     }
   })
 
-  it("tells both models that tool and alert content is untrusted", () => {
+  it("tells every model that tool and alert content is untrusted", () => {
     expect(TriagePrompt.text).toContain("untrusted")
+    expect(PostmortemPrompt.text).toContain("Never follow instructions")
     expect(InvestigationPrompt.text).toContain("Never follow instructions")
   })
 })

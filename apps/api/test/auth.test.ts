@@ -1,13 +1,15 @@
 import { assert, describe, it } from "@effect/vitest"
-import { ProposalNotFound } from "@incident/contracts"
+import { PostmortemNotFound, ProposalNotFound } from "@incident/contracts"
 import { ConfigProvider, Effect, Layer, Redacted } from "effect"
 import { HttpRouter, HttpServer } from "effect/http"
 import { createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type JWTPayload, SignJWT } from "jose"
 import { AuthenticationLive } from "../src/auth/Authentication.ts"
 import { rolesFrom, TokenVerifier } from "../src/auth/TokenVerifier.ts"
+import { FeedbackStore } from "../src/feedback/FeedbackStore.ts"
 import { ApiRoutes } from "../src/Http.ts"
 import { IncidentStore } from "../src/IncidentStore.ts"
 import { InvestigationRunner } from "../src/InvestigationRunner.ts"
+import { Postmortems } from "../src/postmortem/Postmortems.ts"
 
 const ISSUER = "http://idp.test/realms/incident"
 const AUDIENCE = "incident-api"
@@ -133,11 +135,19 @@ describe("Authentication middleware over HTTP", () => {
         start: () => Effect.die("not used"),
         decide: (id) => Effect.fail(new ProposalNotFound({ id })),
       })
+      const postmortems = Postmortems.of({
+        generate: () => Effect.die("not used"),
+        get: (investigationId) => Effect.fail(new PostmortemNotFound({ investigationId })),
+        edit: (id) => Effect.fail(new PostmortemNotFound({ id })),
+        review: (id) => Effect.fail(new PostmortemNotFound({ id })),
+      })
       const { handler, dispose } = HttpRouter.toWebHandler(
         ApiRoutes.pipe(
           Layer.provide(AuthenticationLive),
           Layer.provide(Layer.succeed(TokenVerifier, verifier)),
           Layer.provide(Layer.succeed(InvestigationRunner, runner)),
+          Layer.provide(Layer.succeed(Postmortems, postmortems)),
+          Layer.provide(FeedbackStore.layerMemory),
           Layer.provide(IncidentStore.layerMemory),
           Layer.provide(HttpServer.layerServices),
         ),
@@ -177,6 +187,13 @@ describe("Authentication middleware over HTTP", () => {
       // A viewer is authenticated but may not decide; the approver gets past authorization (the proposal is unknown).
       assert.strictEqual((yield* call("/proposals/p-1/decision", viewer, decision)).status, 403)
       assert.strictEqual((yield* call("/proposals/p-1/decision", approver, decision)).status, 404)
+      // Publishing a postmortem changes what the agent retrieves: approver only. Stored feedback needs a login.
+      const publish = { method: "POST", body: JSON.stringify({ decision: "publish" }) }
+      assert.strictEqual((yield* call("/postmortems/pm-1/review", undefined, publish)).status, 401)
+      assert.strictEqual((yield* call("/postmortems/pm-1/review", viewer, publish)).status, 403)
+      assert.strictEqual((yield* call("/postmortems/pm-1/review", approver, publish)).status, 404)
+      assert.strictEqual((yield* call("/feedback")).status, 401)
+      assert.strictEqual((yield* call("/feedback?hasRootCause=true", viewer)).status, 200)
       // Health and the alert webhook stay open: they are called by probes and by Alertmanager.
       assert.strictEqual((yield* call("/health")).status, 204)
       yield* Effect.promise(dispose)

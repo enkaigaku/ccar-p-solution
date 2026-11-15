@@ -65,8 +65,9 @@ export const rejudge = Effect.fn("evals.rejudge")(function* (results: PromptfooR
       const truth = c.groundTruth
       const base = {
         caseId: c.id,
-        fault: truth === undefined ? "" : `${truth.fault.flag}=${truth.fault.variant}`,
-        distractor: (truth?.distractors ?? []).length > 0,
+        // Feedback cases have no injected flag; they are listed by where they came from.
+        fault: truth === undefined ? "" : "fault" in truth ? `${truth.fault.flag}=${truth.fault.variant}` : "feedback",
+        distractor: truth !== undefined && "distractors" in truth && (truth.distractors ?? []).length > 0,
       }
       const output = row.response?.output
       if (output === undefined || output === null) {

@@ -22,6 +22,8 @@ export const SpanName = {
   report: "incident.report",
   /** Approval executor calling `mcp-ops`. */
   opsExecute: "incident.ops.execute",
+  /** Postmortem draft generation (single Sonnet call), outside the investigation trace. */
+  postmortem: "incident.postmortem",
 } as const
 export type SpanName = (typeof SpanName)[keyof typeof SpanName]
 

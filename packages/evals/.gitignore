@@ -2,3 +2,4 @@
 .replay/
 output/
 .record*.log
+candidates/

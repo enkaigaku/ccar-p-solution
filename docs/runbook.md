@@ -58,7 +58,7 @@ docker compose -f infra/observability/compose.yaml down
 docker compose -f infra/compose.yaml down                    # 不加 -v：保留索引
 ```
 
-api 和 web 直接 Ctrl-C。**api 停了，内存里的告警、调查、提议和反馈就没了**；审计日志在 `infra/.api-state/audit.jsonl` 和 `infra/.ops-state/audit.jsonl`，不受影响。web 停了，所有人要重新登录。
+api 和 web 直接 Ctrl-C。**api 停了，内存里的告警、调查和提议就没了**（反馈和复盘草稿在 Postgres 里）；审计日志在 `infra/.api-state/audit.jsonl` 和 `infra/.ops-state/audit.jsonl`，不受影响。web 停了，所有人要重新登录。
 
 ## 日常操作
 
@@ -78,6 +78,42 @@ pnpm --filter @incident/rag rag ingest
 - 换了 embedding 模型后增量写入会被拒绝，要走一次全量重建。
 
 改检索参数（top-k、融合、rerank）属于「必须附评估结果」的改动。
+
+全量重建默认只读仓库里的语料，**重建后的索引不含 api 发布的复盘**。要保留它们：
+
+```bash
+pnpm --filter @incident/rag rag ingest --also ../../infra/.api-state/corpus
+```
+
+跑要和基线比较的评估之前，先不带 `--also` 重建一次，让索引回到「仓库里的语料」这个确定的状态（理由见 ADR 011）。
+
+### 复盘草稿
+
+调查结束（`completed` 或 `insufficient_information`）后，responder 在控制台生成复盘草稿，或者：
+
+```bash
+curl -X POST localhost:3000/investigations/<id>/postmortem          # 生成（一次 Sonnet 调用，约 0.02 美元）
+curl -X PUT  localhost:3000/postmortems/<pm-id> -d @body.json       # 修改正文
+curl -X POST localhost:3000/postmortems/<pm-id>/review -d '{"decision":"publish"}'   # approver：发布或 reject
+```
+
+- 重新生成会覆盖草稿；已发布或已拒绝的不能再生成、修改或审核。
+- 发布做三件事：把 Markdown 写到 `infra/.api-state/corpus/postmortems/generated/`，增量 ingest 并激活新的 index 版本，写一条 `postmortem_review` 审计。发布返回 503（`reason: ingest`）时草稿没变，修好 Voyage 或数据库后再点一次。
+- 撤回一篇已发布的复盘：删掉那个 Markdown 文件，然后重建索引（`rag ingest`；要保留其余复盘就加 `--also`）。
+
+### 把反馈整理成评估用例
+
+每周做一次。前提是 api 带 `DATABASE_URL` 运行（否则反馈在内存里），并且审计日志是这台机器上的。
+
+```bash
+pnpm --filter @incident/evals evals curate      # 读 GET /feedback 和 infra/.api-state/audit.jsonl，不调用模型
+# 逐个复核 packages/evals/candidates/<id>/case.json，然后：
+pnpm --filter @incident/evals evals promote <id>
+```
+
+api 不是 `AUTH_MODE=dev` 时，给 `curate` 设置 `EVAL_API_TOKEN`（一个 viewer 的访问令牌），或者先把 `GET /feedback?hasRootCause=true` 的结果存成文件再用 `--feedback <file>`。
+
+复核时要改的：`groundTruth.service` 是按告警所在服务猜的，根因在上游时改掉；`rootCause` 收紧成一句话；补 `acceptableAlternatives`；确认 `case.json` 和 `snapshot.json` 里没有不该进仓库的内容。`promote` 之后提交 `datasets/feedback/` 和 `fixtures/replay/<id>/`。
 
 ### 轮换审批签名密钥
 
@@ -166,15 +202,18 @@ Grafana 的 4 条告警会送到 api 的 `/alerts/webhook`，所以系统可以�
 
 ## 数据在哪
 
-| 数据                                     | 位置                                    | 重启后                 |
-| ---------------------------------------- | --------------------------------------- | ---------------------- |
-| 告警、调查、提议、反馈                   | api 进程内存                            | 丢失                   |
-| 控制台会话和令牌                         | web 进程内存                            | 丢失，重新登录         |
-| api 审计（提示、模型输出、工具结果原文） | `infra/.api-state/audit.jsonl`          | 保留，按 trace id 关联 |
-| mcp-ops 审计                             | `infra/.ops-state/audit.jsonl`          | 保留                   |
-| 知识库索引                               | Postgres 卷                             | 保留（`down -v` 会删） |
-| trace、日志、指标                        | 观测后端的卷，Prometheus 本地保留 15 天 | 保留                   |
-| Keycloak 用户和会话                      | 容器内嵌数据库                          | `down` 后丢失          |
-| 评估预算账本                             | `packages/evals/.ledger/`（不在仓库里） | 保留；换机器不跟着走   |
+| 数据                                     | 位置                                                                        | 重启后                       |
+| ---------------------------------------- | --------------------------------------------------------------------------- | ---------------------------- |
+| 告警、调查、提议                         | api 进程内存                                                                | 丢失                         |
+| 反馈、复盘草稿                           | Postgres 表 `api_feedback`、`api_postmortems`；没有 `DATABASE_URL` 时在内存 | 保留（内存模式下丢失）       |
+| 已发布的复盘（Markdown）                 | `infra/.api-state/corpus/postmortems/generated/`                            | 保留；不在仓库里             |
+| 评估用例候选                             | `packages/evals/candidates/`（不在仓库里）                                  | 保留，`promote` 后移入数据集 |
+| 控制台会话和令牌                         | web 进程内存                                                                | 丢失，重新登录               |
+| api 审计（提示、模型输出、工具结果原文） | `infra/.api-state/audit.jsonl`                                              | 保留，按 trace id 关联       |
+| mcp-ops 审计                             | `infra/.ops-state/audit.jsonl`                                              | 保留                         |
+| 知识库索引                               | Postgres 卷                                                                 | 保留（`down -v` 会删）       |
+| trace、日志、指标                        | 观测后端的卷，Prometheus 本地保留 15 天                                     | 保留                         |
+| Keycloak 用户和会话                      | 容器内嵌数据库                                                              | `down` 后丢失                |
+| 评估预算账本                             | `packages/evals/.ledger/`（不在仓库里）                                     | 保留；换机器不跟着走         |
 
 审计文件里有提示词和工具结果的原文，可能含有脱敏后仍然敏感的内容，不要提交，也不要贴到 issue 或 PR 里。
