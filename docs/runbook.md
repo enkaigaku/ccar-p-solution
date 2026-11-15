@@ -29,9 +29,9 @@ docker compose -f infra/observability/compose.yaml up -d     # 观测后端（�
 infra/scripts/otel-demo.sh up                                # 被运维系统，约 6GB 内存
 docker compose --env-file .env -f infra/keycloak/compose.yaml up -d   # 登录，约 30 秒后可用
 
-pnpm --filter @incident/rag rag ingest                       # 第一次，或语料变了之后
+set -a; . ./.env; set +a                                     # 每个新终端都要执行：没有任何脚本会自动读 .env
 
-set -a; . ./.env; set +a                                     # 两个终端都要执行
+pnpm --filter @incident/rag rag ingest                       # 第一次，或语料变了之后
 pnpm dev:api                                                 # 终端 1
 pnpm --filter @incident/web dev                              # 终端 2
 ```
@@ -85,9 +85,10 @@ pnpm --filter @incident/rag rag ingest
 
 1. 确认没有待审批的提议（控制台里没有 `awaiting_approval`），否则已签发的令牌会失效，执行会失败。
 2. `openssl rand -hex 32` 生成新值，写进 `.env`。
-3. 重启 api。mcp-ops 默认由 api 每次执行时以子进程启动，会拿到新值；如果 mcp-ops 是以 `MCP_TRANSPORT=http` 单独运行的，也要用新值重启它。
+3. 停掉 api，在启动它的终端里重新执行 `set -a; . ./.env; set +a`，再启动。只改 `.env` 不重新加载的话，终端里还是旧值，重启后的 api 会继续用旧密钥。mcp-ops 默认由 api 每次执行时以子进程启动，继承 api 的环境，所以 api 用上新值后它也是新值；如果 mcp-ops 是以 `MCP_TRANSPORT=http` 单独运行的，在它的终端里同样重新加载 `.env` 后重启。
+4. 确认生效：在控制台批准一个提议并执行成功。旧密钥签的令牌此时应当被 mcp-ops 拒绝。
 
-密钥泄漏时立即做第 2、3 步，不必等第 1 步。然后查 `infra/.ops-state/audit.jsonl` 里泄漏时间之后的 `accepted` 和 `executed` 记录是否都对应控制台里的审批。
+密钥泄漏时立即做第 2 到 4 步，不必等第 1 步。然后查 `infra/.ops-state/audit.jsonl` 里泄漏时间之后的 `accepted` 和 `executed` 记录是否都对应控制台里的审批。
 
 ### 管理用户和角色
 
