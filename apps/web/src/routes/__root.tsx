@@ -1,8 +1,13 @@
 import { createRootRoute, HeadContent, Link, Outlet, Scripts } from "@tanstack/react-router"
 import type { ReactNode } from "react"
+import { IncidentClient } from "../lib/IncidentClient.ts"
+import { run } from "../lib/load.ts"
+import { roleLabel, SessionContext } from "../lib/session.ts"
 import appCss from "../styles.css?url"
 
 export const Route = createRootRoute({
+  // Without a session this fails with `Unauthorized`, and `run` sends the browser to the login page.
+  loader: () => run(IncidentClient.use((client) => client.session.current())),
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -35,8 +40,10 @@ function RootDocument({ children }: { children: ReactNode }) {
 }
 
 function Layout() {
+  const session = Route.useLoaderData()
+  const principal = session._tag === "Ok" ? session.value : undefined
   return (
-    <>
+    <SessionContext.Provider value={principal}>
       <header className="topbar">
         <Link to="/" className="brand">
           Incident Copilot
@@ -49,8 +56,28 @@ function Layout() {
         <span className="tag tag-ai" title="调查报告由 Claude 生成，结论需人工核对">
           AI 生成内容需人工核对
         </span>
+        {principal === undefined ? null : (
+          <div className="session">
+            <span className="session-user" title={`账号 ${principal.subject}`}>
+              {principal.name}
+            </span>
+            {principal.roles.length === 0 ? (
+              <span className="badge">无角色</span>
+            ) : (
+              principal.roles.map((role) => (
+                <span key={role} className="badge" title={role}>
+                  {roleLabel[role]}
+                </span>
+              ))
+            )}
+            {/* A form POST, not a link: signing out changes state and must not be triggerable by a GET. */}
+            <form method="post" action="/auth/logout">
+              <button type="submit">退出登录</button>
+            </form>
+          </div>
+        )}
       </header>
       <Outlet />
-    </>
+    </SessionContext.Provider>
   )
 }

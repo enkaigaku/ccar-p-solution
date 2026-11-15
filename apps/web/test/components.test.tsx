@@ -64,6 +64,23 @@ describe("ProposalCard", () => {
     expect(screen.queryByRole("button")).toBeNull()
     expect(screen.getByText("已执行")).toBeTruthy()
   })
+  it("shows a pending request without buttons to someone who is not an approver, and who decided afterwards", () => {
+    const decide = async (): Promise<Loaded<ActionProposal>> => ({ _tag: "Ok", value: proposal() })
+    const view = render(<ProposalCard proposal={proposal()} canDecide={false} decide={decide} onDecided={() => {}} />)
+    expect(screen.queryByRole("button", { name: "批准" })).toBeNull()
+    expect(screen.queryByRole("button", { name: "拒绝" })).toBeNull()
+    expect(screen.getByText(/只有 approver 角色可以批准或拒绝/)).toBeTruthy()
+
+    view.rerender(
+      <ProposalCard
+        proposal={proposal({ status: "executed", decidedBy: "alice" })}
+        canDecide={false}
+        decide={decide}
+        onDecided={() => {}}
+      />,
+    )
+    expect(screen.getByText("alice")).toBeTruthy()
+  })
 })
 
 describe("FeedbackForm", () => {

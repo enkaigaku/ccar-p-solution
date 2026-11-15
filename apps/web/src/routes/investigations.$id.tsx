@@ -12,6 +12,7 @@ import { useLiveInvestigation } from "../investigation/useLiveInvestigation.ts"
 import { formatTime } from "../lib/format.ts"
 import { IncidentClient } from "../lib/IncidentClient.ts"
 import { run } from "../lib/load.ts"
+import { can, useSession } from "../lib/session.ts"
 
 export const Route = createFileRoute("/investigations/$id")({
   loader: ({ params }) =>
@@ -53,6 +54,7 @@ function InvestigationPage({
   proposals: ReadonlyArray<ActionProposal>
 }) {
   const [state, dispatch, reconnect] = useLiveInvestigation(investigation, proposals)
+  const principal = useSession()
   const lowConfidence = isLowConfidence(state.status, state.hypotheses)
   const current = state.investigation
 
@@ -162,6 +164,7 @@ function InvestigationPage({
                 <ProposalCard
                   key={p.id}
                   proposal={p}
+                  canDecide={can(principal, "approver")}
                   warning={lowConfidence ? "报告置信度低，批准前请逐条核对上方证据。" : undefined}
                   decide={decide(p.id)}
                   onDecided={(proposal) => dispatch({ _tag: "ProposalUpdated", proposal })}
@@ -173,7 +176,9 @@ function InvestigationPage({
 
           <section aria-labelledby="feedback-heading">
             <h2 id="feedback-heading">反馈</h2>
-            {isTerminal(state.status) || state.status === "awaiting_approval" ? (
+            {!can(principal, "responder") ? (
+              <p className="empty">提交反馈需要 responder 角色。</p>
+            ) : isTerminal(state.status) || state.status === "awaiting_approval" ? (
               <FeedbackForm submit={submitFeedback} />
             ) : (
               <p className="empty">调查结束后可以在这里评价报告并填写实际根因。</p>

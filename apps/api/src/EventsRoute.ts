@@ -1,7 +1,8 @@
 import { InvestigationEvent, InvestigationId } from "@incident/contracts"
-import { Effect, Schema, Stream } from "effect"
+import { Effect, Redacted, Schema, Stream } from "effect"
 import { Sse } from "effect/encoding"
 import { HttpRouter, HttpServerResponse } from "effect/http"
+import { TokenVerifier } from "./auth/TokenVerifier.ts"
 import { InvestigationEvents } from "./events/InvestigationEvents.ts"
 import { IncidentStore } from "./IncidentStore.ts"
 
@@ -15,18 +16,27 @@ export const parseLastEventId = (value: string | undefined): number => {
   return Number.parseInt(value.trim(), 10)
 }
 
+/** The credential of `Authorization: Bearer <token>`; empty when the header is missing or uses another scheme. */
+export const bearerToken = (authorization: string | undefined): Redacted.Redacted<string> =>
+  Redacted.make(/^bearer +(\S+)$/i.exec(authorization?.trim() ?? "")?.[1] ?? "")
+
 /**
  * `GET /investigations/:id/events`: Server-Sent Events, each `data:` a JSON-encoded `InvestigationEvent` and each
  * `id:` its sequence number. Replays history after `Last-Event-ID`, then streams live, and ends after a terminal
- * status. Served next to the HttpApi because it is a stream (see `IncidentApi`).
+ * status. Served next to the HttpApi because it is a stream (see `IncidentApi`), so it checks the bearer token
+ * and the `viewer` role itself, with the same `TokenVerifier` as the HttpApi middleware.
  */
 export const EventsRoute = HttpRouter.use(
   Effect.fn(function* (router) {
     // Resolved when the layer is built, like the HttpApi handlers; route handlers cannot require services.
     const store = yield* IncidentStore
     const events = yield* InvestigationEvents
+    const verifier = yield* TokenVerifier
     yield* router.add("GET", "/investigations/:id/events", (request) =>
       Effect.gen(function* () {
+        const principal = yield* verifier.verify(bearerToken(request.headers.authorization)).pipe(Effect.option)
+        if (principal._tag === "None") return HttpServerResponse.text("unauthorized", { status: 401 })
+        if (!principal.value.roles.includes("viewer")) return HttpServerResponse.text("forbidden", { status: 403 })
         const params = yield* HttpRouter.params
         const id = InvestigationId.make(params.id ?? "")
         const exists = yield* store.getInvestigation(id).pipe(Effect.option)

@@ -8,6 +8,7 @@ import { IncidentClient } from "../lib/IncidentClient.ts"
 import { run } from "../lib/load.ts"
 import { type Recent, readRecent, rememberInvestigation } from "../lib/recent.ts"
 import { sampleWebhook } from "../lib/sampleAlert.ts"
+import { can, useSession } from "../lib/session.ts"
 
 const newestFirst = Order.mapInput(Order.flip(DateTime.Order), (a: Alert) => a.startsAt)
 
@@ -23,6 +24,7 @@ function AlertsPage() {
   const loaded = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
+  const canRespond = can(useSession(), "responder")
   const [starting, setStarting] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const [recent, setRecent] = useState<Recent>([])
@@ -114,7 +116,8 @@ function AlertsPage() {
                     <button
                       type="button"
                       className="primary"
-                      disabled={starting !== undefined}
+                      disabled={starting !== undefined || !canRespond}
+                      title={canRespond ? undefined : "需要 responder 角色"}
                       onClick={() => startInvestigation(alert)}
                     >
                       {starting === alert.id ? "发起中…" : "发起调查"}

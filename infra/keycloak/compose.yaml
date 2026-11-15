@@ -1,0 +1,29 @@
+# Identity provider for the console (OIDC). Runs on the developer's Mac (OrbStack).
+#
+#   docker compose --env-file .env -f infra/keycloak/compose.yaml up -d
+#
+# Secrets come from .env (see .env.example); nothing in this directory contains a credential.
+name: incident-keycloak
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    # start-dev: plain HTTP and an embedded database, for a local demo only. The realm is imported when the
+    # container is created; `down` discards it together with every session, `up` imports it again.
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KC_HEALTH_ENABLED: "true"
+      # Substituted into keycloak/incident-realm.json at import time.
+      INCIDENT_WEB_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?set OIDC_CLIENT_SECRET in .env}
+      INCIDENT_DEMO_PASSWORD: ${KEYCLOAK_DEMO_PASSWORD:?set KEYCLOAK_DEMO_PASSWORD in .env}
+      INCIDENT_WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3001}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./incident-realm.json:/opt/keycloak/data/import/incident-realm.json:ro
+    deploy:
+      resources:
+        limits:
+          memory: 1g
