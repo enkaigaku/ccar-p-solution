@@ -56,10 +56,22 @@ export const p95ByOperation = (service: string) =>
   `histogram_quantile(0.95, sum by (le, span_name) (rate(traces_span_metrics_duration_bucket{service_name="${service}"}[3m])))`
 
 /**
+ * p95 in seconds of a service's outgoing calls, one series per callee, from the gateway collector's service graph.
+ * Span metrics cannot do this: an HTTP client span is named by its method only, so checkout's calls to email and to
+ * shipping are both `POST`. A service that calls nothing returns no series.
+ */
+export const p95ByCallee = (service: string) =>
+  `histogram_quantile(0.95, sum by (le, server) (rate(traces_service_graph_request_client_bucket{client="${service}"}[3m])))`
+
+/**
  * The latency forms the `query_metrics` description of mcp-observability recommends, per service. Keep them equal
  * to that description: replay only answers a query it has a recording of.
  */
-export const latencyQueries = (service: string): ReadonlyArray<string> => [serverP95(service), p95ByOperation(service)]
+export const latencyQueries = (service: string): ReadonlyArray<string> => [
+  serverP95(service),
+  p95ByOperation(service),
+  p95ByCallee(service),
+]
 
 /** p95 of one span. A slow span that is a small share of a service's calls does not move the service's p95. */
 export const spanP95 = (service: string, span: string) =>

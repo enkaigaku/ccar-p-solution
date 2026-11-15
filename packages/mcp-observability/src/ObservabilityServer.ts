@@ -34,7 +34,9 @@ export const observabilityTools = [
       'request rate: sum(rate(traces_span_metrics_calls{service_name="<service>"}[3m]))',
       'p95 latency in ms of the requests a service serves: histogram_quantile(0.95, sum by (le) (rate(traces_span_metrics_duration_bucket{service_name="<service>",span_kind="SPAN_KIND_SERVER"}[3m])))',
       'p95 latency in ms of each operation (span name) of a service: histogram_quantile(0.95, sum by (le, span_name) (rate(traces_span_metrics_duration_bucket{service_name="<service>"}[3m])))',
+      'p95 latency in seconds of a service\'s outgoing calls, one series per callee (label server): histogram_quantile(0.95, sum by (le, server) (rate(traces_service_graph_request_client_bucket{client="<service>"}[3m])))',
       "An operation that is a small share of a service's requests does not move the service's p95, so look at the per-operation form before ruling a service out. The per-operation form also lists the service's outgoing calls; a long-lived streaming client span reports how long the stream stayed open, not a request latency.",
+      "An outgoing HTTP call is often named only by its method (`POST`), which merges the calls to every HTTP callee into one series. The per-callee form tells them apart. It comes from the service graph, not from span metrics: values are in seconds, anything faster than 10 ms reads as about 0.0095, and the histogram tops out at 10 s.",
     ].join("\n"),
     ...ObservabilityTools.query_metrics,
     annotations: { title: "Query metrics", ...readOnly },
@@ -84,7 +86,7 @@ export const observabilityTools = [
   tool({
     name: "get_service_status",
     description:
-      "Container state, restart count and image tag of the OpenTelemetry Demo's docker compose services, optionally for one service.",
+      "Container state, restart count and image tag of the OpenTelemetry Demo's docker compose services, optionally for one service. `restarts` counts every restart since the container was created, which can be days ago; it does not say when they happened, so a non-zero count is not evidence that the service restarted during the incident.",
     ...ObservabilityTools.get_service_status,
     annotations: { title: "Get service status", ...readOnly },
     untrustedOutput: true,

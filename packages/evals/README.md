@@ -90,7 +90,7 @@ src/record/              flagd 注入、MCP 客户端、录制器、故障场景
 
 触发条件按 2026-11-14 的一次真实录制校准过，几条容易踩的坑：
 
-- 服务级 p95 会被占比小的慢 span 稀释，也会被 flagd 的长连接 span（`flagd.evaluation.v2.Service/EventStream`，约 10 分钟）污染。延迟类场景的触发查询因此按具体 span 过滤（`spanP95`）。每个服务还会录两条 `query_metrics` 工具说明里推荐的延迟查询（`latencyQueries`）：只算 SERVER span 的 p95，和按 span 名拆分的 p95。
+- 服务级 p95 会被占比小的慢 span 稀释，也会被 flagd 的长连接 span（`flagd.evaluation.v2.Service/EventStream`，约 10 分钟）污染。延迟类场景的触发查询因此按具体 span 过滤（`spanP95`）。每个服务还会录三条 `query_metrics` 工具说明里推荐的延迟查询（`latencyQueries`）：只算 SERVER span 的 p95、按 span 名拆分的 p95，以及按被调用方拆分的出站调用 p95。最后一条来自网关 collector 的 service graph（单位是秒，上限 10 秒），因为 HTTP 的 CLIENT span 只以方法命名，checkout 调 email 和调 shipping 在 span 指标里都是 `POST`。
 - `adHighCpu` 不影响延迟，触发看 `jvm_cpu_recent_utilization`；`loadGeneratorFloodHomepage` 不影响延迟，触发看首页请求率；`imageSlowLoad` 的延迟加在 frontend-proxy 上，image-provider 和 frontend 的 p95 都不变。
 - `productCatalogFailure`、`kafkaQueueProblems`、`failedReadinessProbe` 在 docker compose 部署下没有任何可观测的变化（没有错误 span；核心 compose 不带 Kafka；没有组件响应 readiness probe），不在目录里。
 
