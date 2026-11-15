@@ -59,10 +59,10 @@ pnpm --filter @incident/evals eval:ci
 
    promptfoo 有用例未通过时退出码是 100，这不是运行失败，照常进入下一步。其他非零退出码是真的失败。
 
-6. 过门禁：
+6. 过门禁。pnpm 在包目录（`packages/evals`）里执行脚本，所以结果文件的路径相对于这个包，和上一步写出的路径一致，不要再加 `packages/evals/` 前缀：
 
    ```bash
-   pnpm --filter @incident/evals evals gate packages/evals/.results/<文件> --min-cases <期望条数> --min-top3 0.85
+   pnpm --filter @incident/evals evals gate .results/<文件> --min-cases <期望条数> --min-top3 0.85
    ```
 
 7. 再看一次 `evals budget`，记下这次实际花了多少。
