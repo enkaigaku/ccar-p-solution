@@ -49,10 +49,12 @@ src/record/              flagd 注入、MCP 客户端、录制器、故障场景
 | 命令                                                                        | agent / judge                     | 费用                 |
 | --------------------------------------------------------------------------- | --------------------------------- | -------------------- |
 | `pnpm --filter @incident/evals eval:stub`                                   | 启发式 stub / 关键词 judge        | 0                    |
+| `pnpm --filter @incident/evals eval:ci`                                     | 同上，再过一遍门禁（CI 用）       | 0                    |
 | `EVAL_AGENT=api EVAL_JUDGE=claude pnpm --filter @incident/evals eval:smoke` | api 中的真实 agent / Claude judge | 约 3.5 美元（10 条） |
 | `EVAL_AGENT=api EVAL_JUDGE=claude pnpm --filter @incident/evals eval:full`  | 同上                              | 约 24 美元（69 条）  |
 
 - 默认 `EVAL_AGENT=stub`、`EVAL_JUDGE=keyword`，直接跑 `promptfoo eval` 也不会花钱。
+- 门禁：`pnpm --filter @incident/evals evals gate <promptfoo 的 --output 文件> [--min-cases N] [--min-top3 0.85]` 只读结果文件，不调用任何服务。每条用例都要有输出、引用有效、没有安全违规；根因 top-3 只在给了 `--min-top3` 时才参与门禁（stub 是启发式的，不能拿它的命中率当门槛）。真实评估跑完后可以用 `--min-top3 0.85` 对照设计文档的门槛。
 - api 模式下 provider 把每条用例的快照写到 `EVAL_REPLAY_DIR`（默认 `.replay/`）。api 需以 `AUTH_MODE=dev`（评估客户端不带访问令牌）和 `OBS_REPLAY_DIR=<同一目录的绝对路径>` 启动：每次调查按告警 fingerprint（即用例 id）启动一个回放模式的 mcp-observability。步骤见 `apps/api/README.md`。
 - 预算守卫在 promptfoo 的 `beforeAll` 钩子里执行，绕过 pnpm 脚本也生效：月度上限 500 美元，当月用量（本地账本 `.ledger/` 与 `EVAL_MONTH_SPEND_USD` 取大者）加本次估算超过 80% 时拒绝全量评估，冒烟每月最多 50 次、全量 8 次。`pnpm --filter @incident/evals evals budget` 查看当月用量。
 
@@ -113,4 +115,4 @@ src/record/              flagd 注入、MCP 客户端、录制器、故障场景
 
 - 检索集要等 `packages/rag` 的语料入库后才能标注；`evaluateRetrieval` 与门禁逻辑已就绪。
 - 两套配置的 A/B 对比（prompt 版本、模型、effort）按 ADR 006 放在 M3。
-- CI 里还没有真实冒烟评估（需要密钥和 Postgres）；现在 `pnpm test` 覆盖 stub 全链路，真实评估在本机跑。
+- CI（`.github/workflows/ci.yml`）每个 PR 跑两项不花钱的评估：`smoke-eval` 用 stub agent 跑 10 条冒烟用例并过门禁，`retrieval-eval` 用离线嵌入对真实的 pgvector 跑检索门禁。两者检查的是数据集、快照、评分、SQL 和接线有没有坏，不能说明 agent 或检索的真实质量；真实 agent 的冒烟评估（约 3.5 美元）和 Voyage 检索评估仍在本机跑，CI 里没有 Claude 或 Voyage 的密钥。
