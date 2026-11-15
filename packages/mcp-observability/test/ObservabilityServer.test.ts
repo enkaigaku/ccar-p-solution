@@ -1,9 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import { QueryLogsOutput, QueryMetricsOutput } from "@incident/contracts"
 import { Effect, Layer, Schema } from "effect"
-import { LIMITS } from "../src/LiveSource.ts"
 import { ToolError } from "../src/McpToolServer.ts"
-import { truncateLine } from "../src/ObservabilityServer.ts"
 import { TelemetrySource } from "../src/TelemetrySource.ts"
 import { connect, text } from "./harness.ts"
 
@@ -76,15 +74,6 @@ describe("mcp-observability tools/call", () => {
       assert.strictEqual(out.topMessages[0]?.pattern, "card for [EMAIL] declined")
     }).pipe(Effect.scoped),
   )
-
-  it("cuts long sample lines and leaves short ones alone", () => {
-    const short = "x".repeat(LIMITS.sampleLineChars)
-    assert.strictEqual(truncateLine(short), short)
-    const cut = truncateLine(`${short}tail that is dropped`)
-    assert.isTrue(cut.startsWith(short))
-    assert.isTrue(cut.endsWith("… [truncated]"))
-    assert.notInclude(cut, "tail that is dropped")
-  })
 
   it.effect("wraps text output as untrusted data that cannot close its own wrapper", () =>
     Effect.gen(function* () {

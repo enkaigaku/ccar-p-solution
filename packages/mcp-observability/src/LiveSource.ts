@@ -11,16 +11,9 @@ export const LIMITS = {
   metricSeries: 20,
   metricTailPoints: 12,
   logLinesScanned: 1000,
-  /** Samples returned when the caller gives no `limit`. The counts and message patterns cover the rest. */
-  defaultLogSamples: 10,
+  defaultLogSamples: 20,
   topMessages: 10,
-  /** Longest line read from the log backend. */
   sampleChars: 1000,
-  /**
-   * Longest sample line a tool result carries. Access logs run to several hundred characters a line (user agent,
-   * upstream addresses); what identifies the request is at the start.
-   */
-  sampleLineChars: 240,
   traceSpans: 100,
 } as const
 

@@ -4,13 +4,13 @@
 
 ## 工具
 
-| 工具                   | 后端                                                  | 返回                                                                                |
-| ---------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `query_metrics`        | Prometheus `query_range`                              | 每条序列 min/max/avg/last + 12 点降采样尾巴，最多 20 条                             |
-| `query_logs`           | Loki（按 `service_name` 和 `detected_level`）         | 按级别计数、top 10 消息模式、最多 `limit`（默认 10）条脱敏样本，每行最多 240 个字符 |
-| `get_trace`            | Tempo `/api/traces/{id}`                              | 根服务、总耗时、最多 100 个 span（优先保留错误和最慢的）                            |
-| `get_service_status`   | `docker ps` / `docker inspect`（只读）                | 容器状态、重启次数、镜像 tag                                                        |
-| `get_service_topology` | Prometheus service graph 指标，无数据时用内置静态拓扑 | 调用边，可只取某服务的直接邻居                                                      |
+| 工具                   | 后端                                                  | 返回                                                           |
+| ---------------------- | ----------------------------------------------------- | -------------------------------------------------------------- |
+| `query_metrics`        | Prometheus `query_range`                              | 每条序列 min/max/avg/last + 12 点降采样尾巴，最多 20 条        |
+| `query_logs`           | Loki（按 `service_name` 和 `detected_level`）         | 按级别计数、top 10 消息模式、最多 `limit`（默认 20）条脱敏样本 |
+| `get_trace`            | Tempo `/api/traces/{id}`                              | 根服务、总耗时、最多 100 个 span（优先保留错误和最慢的）       |
+| `get_service_status`   | `docker ps` / `docker inspect`（只读）                | 容器状态、重启次数、镜像 tag                                   |
+| `get_service_topology` | Prometheus service graph 指标，无数据时用内置静态拓扑 | 调用边，可只取某服务的直接邻居                                 |
 
 - 每个结果都带 `ref`（同一工具同一入参得到同一 ref），日志样本带 `ref#i`；agent 的报告只能引用出现过的 ref。
 - 文本内容包在 `<untrusted-data>` 里并声明为数据（`<` 转义，日志内容无法提前闭合标记）；`structuredContent` 保持原样，由 api 组装提示时再按自己的标记包装。
