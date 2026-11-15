@@ -7,18 +7,21 @@ import type { AlertCategory } from "./triage.ts"
  */
 export const Methodologies: Readonly<Record<AlertCategory, Prompt>> = {
   latency: {
-    version: "method-latency@2",
+    version: "method-latency@3",
     text: `Methodology: elevated latency.
 1. Confirm the symptom with a latency metric for the alerting service and find when it started. Break the
    alerting service's latency down per operation: the slow operation tells you which call path to follow.
 2. Walk the dependency graph downstream along that path. Latency usually originates in a callee: compare the
    latency of each direct dependency over the same window. A dependency whose overall p95 is flat can still
    have one slow operation that is a small share of its requests, so break each dependency on the path down
-   per operation before ruling it out.
+   per operation before ruling it out. When the slow operation is an outgoing call whose name does not say
+   which service it goes to (an HTTP client span named only \`POST\` or \`GET\`), break the service's outgoing
+   latency down per callee and follow the slow callee; do not pick a callee from other signals.
 3. Judge a service by the requests it serves. An outgoing call that is always slow, before the symptom
    started as well as after, is not the cause; a stream that stays open for seconds or minutes is not a
    slow request.
-4. Look for saturation in the slowest component: CPU, memory, garbage collection, restarts.
+4. Look for saturation in the slowest component: CPU, memory, garbage collection, restarts. A restart count
+   is cumulative; it supports a cause only when something else shows the restarts happened in this window.
 5. Fetch a slow trace when you have a trace id and identify the span that dominates the duration.
 6. Check whether a feature flag, deployment or restart lines up with the start of the symptom.`,
   },

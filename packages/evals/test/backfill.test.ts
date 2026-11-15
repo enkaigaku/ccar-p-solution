@@ -3,7 +3,7 @@ import { type RecordedToolCall, ReplaySnapshot } from "@incident/contracts"
 import { DateTime, Effect, Layer, Ref } from "effect"
 import { backfillLatency } from "../src/record/backfill.ts"
 import { ObservabilityMcp } from "../src/record/ObservabilityMcp.ts"
-import { latencyQueries, p95, p95ByOperation, serverP95 } from "../src/record/scenarios.ts"
+import { latencyQueries, p95, p95ByCallee, p95ByOperation, serverP95 } from "../src/record/scenarios.ts"
 
 const logs = (service: string): RecordedToolCall => ({
   tool: "query_logs",
@@ -63,7 +63,7 @@ describe("backfillLatency", () => {
       ])
       const { snapshot: after, added } = yield* backfillLatency(before).pipe(Effect.provide(fakeMcp(asked)))
 
-      assert.strictEqual(added, 4)
+      assert.strictEqual(added, 6)
       assert.deepStrictEqual(
         (yield* Ref.get(asked)).map((q) => q.promql),
         [...latencyQueries("checkout"), ...latencyQueries("shipping")],
@@ -74,7 +74,7 @@ describe("backfillLatency", () => {
       }
       // The recorded calls stay in place, in order; the new ones follow.
       assert.deepStrictEqual(after.calls.slice(0, before.calls.length), before.calls)
-      assert.strictEqual(after.calls.length, before.calls.length + 4)
+      assert.strictEqual(after.calls.length, before.calls.length + 6)
       assert.strictEqual(after.caseId, before.caseId)
     }),
   )
@@ -84,15 +84,15 @@ describe("backfillLatency", () => {
       const asked = yield* Ref.make<Array<{ promql: string; start: string; end: string }>>([])
       const before = snapshot([logs("payment"), metrics(serverP95("payment"))])
       const once = yield* backfillLatency(before).pipe(Effect.provide(fakeMcp(asked)))
-      assert.strictEqual(once.added, 1)
+      assert.strictEqual(once.added, 2)
       assert.deepStrictEqual(
         (yield* Ref.get(asked)).map((q) => q.promql),
-        [p95ByOperation("payment")],
+        [p95ByOperation("payment"), p95ByCallee("payment")],
       )
       const twice = yield* backfillLatency(once.snapshot).pipe(Effect.provide(fakeMcp(asked)))
       assert.strictEqual(twice.added, 0)
       assert.strictEqual(twice.snapshot, once.snapshot)
-      assert.strictEqual((yield* Ref.get(asked)).length, 1)
+      assert.strictEqual((yield* Ref.get(asked)).length, 2)
     }),
   )
 })
