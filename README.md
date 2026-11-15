@@ -7,6 +7,8 @@ Incident Copilot：面向 CCAR-P 备考的端到端 Claude 解决方案，覆盖
 - 设计文档：<https://claude.ai/artifact/NwAJdxF4uv8qXb3f3PBjNr>
 - 架构决策：[`docs/adr/`](docs/adr/README.md)
 - 开发与审查规则：[`AGENTS.md`](AGENTS.md)
+- 接手项目：[交接文档](docs/handoff.md)、[运维手册](docs/runbook.md)、[M3 阶段复盘](docs/retro-m3.md)
+- 跑评估的流程（Claude Code Skill）：[`.claude/skills/run-evals/SKILL.md`](.claude/skills/run-evals/SKILL.md)
 
 ## 快速开始
 
