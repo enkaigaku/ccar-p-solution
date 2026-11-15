@@ -1,4 +1,10 @@
-import { CurrentPrincipal, IncidentApi, requireRole } from "@incident/contracts"
+import {
+  CurrentPrincipal,
+  IncidentApi,
+  PostmortemNotFound,
+  PostmortemUnavailable,
+  requireRole,
+} from "@incident/contracts"
 import { recordFeedback } from "@incident/telemetry"
 import { Effect, Layer } from "effect"
 import { HttpApiBuilder } from "effect/http-api"
@@ -47,8 +53,33 @@ const InvestigationsHandlers = HttpApiBuilder.group(
           Effect.andThen(store.addFeedback(params.id, payload)),
           Effect.tap(() => recordFeedback(payload.rating)),
         ),
+      // Postmortems are not implemented yet: the endpoints exist so the console can be built against them.
+      generatePostmortem: ({ params }) =>
+        requireRole("responder").pipe(
+          Effect.andThen(store.getInvestigation(params.id)),
+          Effect.andThen(new PostmortemUnavailable({ reason: "model", message: "postmortem drafts are not enabled" })),
+        ),
+      postmortem: ({ params }) =>
+        requireRole("viewer").pipe(
+          Effect.andThen(store.getInvestigation(params.id)),
+          Effect.andThen(new PostmortemNotFound({ investigationId: params.id })),
+        ),
     })
   }),
+)
+
+const PostmortemsHandlers = HttpApiBuilder.group(IncidentApi, "postmortems", (handlers) =>
+  Effect.succeed(
+    handlers.handleAll({
+      edit: ({ params }) => requireRole("responder").pipe(Effect.andThen(new PostmortemNotFound({ id: params.id }))),
+      review: ({ params }) => requireRole("approver").pipe(Effect.andThen(new PostmortemNotFound({ id: params.id }))),
+    }),
+  ),
+)
+
+// Feedback is not persisted yet, so there is nothing to list.
+const FeedbackHandlers = HttpApiBuilder.group(IncidentApi, "feedback", (handlers) =>
+  Effect.succeed(handlers.handleAll({ list: () => requireRole("viewer").pipe(Effect.as([])) })),
 )
 
 const ProposalsHandlers = HttpApiBuilder.group(
@@ -73,6 +104,8 @@ export const HandlersLayer = Layer.mergeAll(
   AlertsHandlers,
   InvestigationsHandlers,
   ProposalsHandlers,
+  PostmortemsHandlers,
+  FeedbackHandlers,
 )
 
 export const ApiRoutes = HttpApiBuilder.layer(IncidentApi, { openapiPath: "/openapi.json" }).pipe(
