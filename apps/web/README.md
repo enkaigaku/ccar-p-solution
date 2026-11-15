@@ -15,10 +15,10 @@ pnpm --filter @incident/web dev      # http://localhost:3001
 
 ## 页面
 
-| 路由                  | 内容                                                           |
-| --------------------- | -------------------------------------------------------------- |
-| `/`                   | 告警列表、发起调查、本浏览器最近打开的调查、按 ID 打开调查     |
-| `/investigations/$id` | 调查过程时间线（SSE 实时）、根因假设与证据、处置建议审批、反馈 |
+| 路由                  | 内容                                                                                                              |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `/`                   | 告警列表、发起调查、本浏览器最近打开的调查、按 ID 打开调查                                                        |
+| `/investigations/$id` | 调查过程时间线（SSE 实时）、根因假设与证据、处置建议审批、反馈、复盘草稿（生成、修改、审核发布到知识库，ADR 011） |
 
 审批要点两次：第二次会复述将要执行的操作。低置信度或「信息不足」的报告有醒目标记；页面展示模型、prompt 版本、索引版本和 trace id，所有模型结论都标注「AI 生成」。
 
@@ -44,7 +44,7 @@ pnpm --filter @incident/web dev      # http://localhost:3001
 - 未登录时任何 `/api` 请求得到 401（`Unauthorized`），页面跳到 `/auth/login?returnTo=<当前路径>`，登录后回到原页面。`returnTo` 只接受站内路径：按浏览器的方式解析后再检查，含控制字符、空格或反斜杠的值一律回到首页。
 - 发起登录时写入一个只在 `/auth` 下发送的 `incident_login` cookie，callback 只在带着它的浏览器里完成，别处打开的 callback 链接不会登录（防登录 CSRF）。
 - 浏览器只有一个 `HttpOnly`、`SameSite=Lax` 的会话 cookie（`incident_session`），令牌留在 web 服务端。访问令牌快过期时由代理用 refresh token 续期；续期被拒绝或会话满 8 小时则会话结束。
-- 顶栏显示用户名和角色。没有 responder 角色时「发起调查」置灰、反馈表单不显示；没有 approver 角色时审批单只读。这些只是界面上的提示，真正的校验在 api。
+- 顶栏显示用户名和角色。没有 responder 角色时「发起调查」置灰、反馈表单不显示；没有 approver 角色时审批单只读，复盘草稿也不能发布或拒绝。这些只是界面上的提示，真正的校验在 api。
 - 审批单在处理后显示审批人。
 
 ## 与 apps/api 的约定
@@ -54,4 +54,4 @@ pnpm --filter @incident/web dev      # http://localhost:3001
 
 ## 测试
 
-`pnpm --filter @incident/web test`：reducer、SSE 解码与重连（`TestClock`）、轮询回退、HttpApiClient 编解码、代理、登录与会话（假的身份提供方 + `TestClock`）、审批与反馈组件（jsdom）。全部用内存 `HttpClient`，不连网络。
+`pnpm --filter @incident/web test`：reducer、SSE 解码与重连（`TestClock`）、轮询回退、HttpApiClient 编解码、代理、登录与会话（假的身份提供方 + `TestClock`）、审批、反馈与复盘组件（jsdom）。全部用内存 `HttpClient`，不连网络。

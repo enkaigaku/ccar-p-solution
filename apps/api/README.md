@@ -61,13 +61,13 @@ AUTH_MODE=dev pnpm dev:api        # http://localhost:3000/docs，不认证
 
 ### 认证与角色
 
-| 端点                                                                | 角色       |
-| ------------------------------------------------------------------- | ---------- |
-| `GET /health`、`POST /alerts/webhook`                               | 不需要认证 |
-| `GET /session`                                                      | 已登录即可 |
-| `GET /alerts`、`GET /investigations/:id`、`…/proposals`、`…/events` | viewer     |
-| `POST /investigations`、`POST /investigations/:id/feedback`         | responder  |
-| `POST /proposals/:id/decision`                                      | approver   |
+| 端点                                                                                                                       | 角色       |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `GET /health`、`POST /alerts/webhook`                                                                                      | 不需要认证 |
+| `GET /session`                                                                                                             | 已登录即可 |
+| `GET /alerts`、`GET /investigations/:id`、`…/proposals`、`…/events`、`…/postmortem`、`GET /feedback`                       | viewer     |
+| `POST /investigations`、`POST /investigations/:id/feedback`、`POST /investigations/:id/postmortem`、`PUT /postmortems/:id` | responder  |
+| `POST /proposals/:id/decision`、`POST /postmortems/:id/review`                                                             | approver   |
 
 api 只接受 `Authorization: Bearer <访问令牌>`，不处理登录流程和 cookie；令牌由 web 的 `/api` 代理附上。ID token 的 `aud` 是 web 客户端，会被拒绝。
 
