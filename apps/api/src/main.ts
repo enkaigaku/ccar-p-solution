@@ -7,7 +7,7 @@ import { HttpRouter } from "effect/http"
 import { HttpApiScalar } from "effect/http-api"
 import { EventsRoute } from "./EventsRoute.ts"
 import { ApiRoutes } from "./Http.ts"
-import { AppLive } from "./Live.ts"
+import { AppLive, AuthenticationPlaceholder } from "./Live.ts"
 
 const DocsRoute = HttpApiScalar.layer(IncidentApi, { path: "/docs" })
 
@@ -20,6 +20,7 @@ const ServerLayer = Layer.unwrap(
   }),
 ).pipe(
   Layer.provide(AppLive),
+  Layer.provide(AuthenticationPlaceholder),
   // Provided last so every span, including the HTTP server spans, is exported.
   Layer.provide(TelemetryLive({ serviceName: "incident-api" })),
 )

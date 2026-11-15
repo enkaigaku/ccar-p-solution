@@ -32,6 +32,8 @@ export class ActionProposal extends Schema.Class<ActionProposal>("@incident/cont
   rollbackPlan: Schema.String,
   status: Schema.Literals(["pending", "approved", "rejected", "expired", "executed", "failed"]),
   createdAt: Schema.DateTimeUtcFromString,
+  /** Name of the approver who approved or rejected it (`Principal.name`). Absent while pending or expired. */
+  decidedBy: Schema.optionalKey(Schema.String),
 }) {}
 
 export const Decision = Schema.Literals(["approved", "rejected"])

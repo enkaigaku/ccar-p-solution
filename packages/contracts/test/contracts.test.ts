@@ -1,16 +1,22 @@
 import { assert, describe, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import {
+  ActionProposal,
   AlertmanagerWebhook,
+  Authentication,
+  CurrentPrincipal,
+  IncidentApi,
   Investigation,
   InvestigationEvent,
   ObservabilityTools,
   OpsTools,
+  Principal,
   ReplaySnapshot,
   RetrievalQuery,
   Retriever,
   replayFallbackKey,
   replayKey,
+  requireRole,
   StatusChanged,
 } from "../src/index.ts"
 
@@ -82,6 +88,55 @@ describe("HTTP and event contracts", () => {
     const event = StatusChanged.make({ investigationId: "inv-1" as never, status: "running" })
     const decoded = Schema.decodeUnknownSync(codec)(JSON.parse(JSON.stringify(Schema.encodeSync(codec)(event))))
     assert.strictEqual(decoded._tag, "StatusChanged")
+  })
+})
+
+describe("authentication contract", () => {
+  const responder = new Principal({ subject: "u-1", name: "alice", roles: ["viewer", "responder"] })
+
+  it.effect("requireRole returns the principal when it holds the role and fails with Forbidden otherwise", () =>
+    Effect.gen(function* () {
+      const allowed = yield* requireRole("responder")
+      assert.strictEqual(allowed.subject, "u-1")
+      const denied = yield* requireRole("approver").pipe(Effect.flip)
+      assert.strictEqual(denied._tag, "Forbidden")
+      assert.strictEqual(denied.required, "approver")
+    }).pipe(Effect.provideService(CurrentPrincipal, responder)),
+  )
+
+  it("rejects a principal with an unknown role or an empty subject", () => {
+    const decode = Schema.decodeUnknownResult(Principal)
+    assert.strictEqual(decode({ subject: "u-1", name: "alice", roles: ["admin"] })._tag, "Failure")
+    assert.strictEqual(decode({ subject: "", name: "alice", roles: [] })._tag, "Failure")
+  })
+
+  it("every endpoint except health and the alert webhook requires authentication", () => {
+    const open: Array<string> = []
+    for (const group of Object.values(IncidentApi.groups)) {
+      for (const [name, endpoint] of Object.entries(group.endpoints)) {
+        if (!endpoint.middlewares.has(Authentication)) open.push(`${group.identifier}.${name}`)
+      }
+    }
+    assert.deepStrictEqual(open.sort(), ["alerts.webhook", "system.health"])
+  })
+
+  it("decodes a proposal with and without decidedBy", () => {
+    const base = {
+      id: "p-1",
+      investigationId: "inv-1",
+      action: { _tag: "RestartService", service: "checkout" },
+      rationale: "r",
+      expectedEffect: "e",
+      rollbackPlan: "b",
+      status: "pending",
+      createdAt: "2026-11-12T03:00:00Z",
+    }
+    const json = Schema.toCodecJson(ActionProposal)
+    assert.isUndefined(Schema.decodeUnknownSync(json)(base).decidedBy)
+    assert.strictEqual(
+      Schema.decodeUnknownSync(json)({ ...base, status: "rejected", decidedBy: "alice" }).decidedBy,
+      "alice",
+    )
   })
 })
 
