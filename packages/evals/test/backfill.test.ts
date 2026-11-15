@@ -53,7 +53,14 @@ describe("backfillLatency", () => {
   it.effect("adds the latency queries for every service the snapshot has logs for, over its window", () =>
     Effect.gen(function* () {
       const asked = yield* Ref.make<Array<{ promql: string; start: string; end: string }>>([])
-      const before = snapshot([logs("shipping"), logs("checkout"), logs("checkout"), metrics(p95("checkout"))])
+      // `user` is a stand-in node of the service graph: it has no metrics and gets no queries.
+      const before = snapshot([
+        logs("shipping"),
+        logs("checkout"),
+        logs("checkout"),
+        logs("user"),
+        metrics(p95("checkout")),
+      ])
       const { snapshot: after, added } = yield* backfillLatency(before).pipe(Effect.provide(fakeMcp(asked)))
 
       assert.strictEqual(added, 4)

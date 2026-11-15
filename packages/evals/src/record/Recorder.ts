@@ -44,7 +44,7 @@ const TraceIdPattern = /\b[0-9a-f]{32}\b/g
  * Topology nodes that are not worth a scenario's time: `user` and `unknown` are the service graph's stand-ins for
  * callers without telemetry, and every service talks to flagd.
  */
-const NOT_RECORDED: ReadonlySet<string> = new Set(["user", "unknown", "flagd"])
+export const NOT_RECORDED: ReadonlySet<string> = new Set(["user", "unknown", "flagd"])
 
 /** Every flag a scenario turns on: its fault first, then the distractors. */
 export const faultsOf = (scenario: Scenario): ReadonlyArray<Fault> => [

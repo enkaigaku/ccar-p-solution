@@ -73,7 +73,7 @@ src/record/              flagd 注入、MCP 客户端、录制器、故障场景
    录制器原地改写 `infra/.otel-demo/src/flagd/demo.flagd.json` 注入故障（不用「写临时文件再重命名」，那样 flagd 每次都要重新打开文件，是丢监听的来源），无论成功与否最后都会把所有 flag 复位为 `off`。开始前先核对所有场景的 flag 和 variant 在该文件里都存在，缺一个就不启动。触发超时或某次工具调用失败的场景会被跳过并在最后列出，连续 3 个场景因工具调用失败则中止（后端挂了）。可用 `--flagd-file`、`--mcp "<命令>"`、`--cooldown-minutes` 覆盖默认值。
    OTel Demo 会把故障注入本身写进日志（`Feature Flag adManualGc enabled, …`），这类点名 flag 的行等于把答案写在日志里。录制器在写快照前把它们从 `query_logs` 结果里去掉（`src/record/scrub.ts`），只描述服务行为、不点名 flag 的行保留。旧快照用 `pnpm --filter @incident/evals evals scrub` 处理一次。
 
-   工具说明里新增查询写法后，旧快照没有对应的录制。`pnpm --filter @incident/evals evals backfill` 用每个快照自己的时间窗口向在线的 mcp-observability 补录缺少的延迟查询，不需要重新注入故障；前提是 Prometheus 还保留着那段数据（本地保留 15 天）。
+   工具说明里新增查询写法后，旧快照没有对应的录制。`pnpm --filter @incident/evals evals backfill` 用每个快照自己的时间窗口向在线的 mcp-observability 补录缺少的延迟查询，不需要重新注入故障；前提是 Prometheus 还保留着那段数据（本地保留 15 天）。写回的快照是单行 JSON，提交前对 `packages/evals/fixtures/replay` 跑一次 `biome format --write`。
 4. 复核新生成的 `datasets/fault/<id>.json`：根因描述是否准确，挑 1–2 条改成 `"smoke": true`，然后提交用例和 `fixtures/replay/<id>/`。
 5. 触发条件是相对的：录制器在注入故障前先量一次触发查询的基线，注入后数值比基线高出场景的 `threshold` 才算触发，所以阈值不依赖本机的流量大小。某个场景超时不会中断后面的场景，报错里带有基线和观察到的最高值（`baseline …, highest seen …`），据此调整 `src/record/scenarios.ts` 里的阈值；显示 `no data` 说明查询的指标在本机不存在。
 6. 每个服务录三次日志：`error`、`warn` 和不带级别。`level` 在实时查询里是精确匹配，很多服务把失败请求记在 `warn`，回放时按级别查询只会命中同级别的录制。
