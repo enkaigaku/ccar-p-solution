@@ -1,6 +1,6 @@
 import { NodeHttpClient, NodeRuntime, NodeServices } from "@effect/platform-node"
 import { ReplaySnapshot } from "@incident/contracts"
-import { Console, DateTime, Duration, Effect, FileSystem, Layer, Option } from "effect"
+import { Console, DateTime, Duration, Effect, FileSystem, Layer, Option, Path } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
 import { BudgetGuard, BudgetPolicy } from "./budget/Budget.ts"
 import { Datasets, packageRoot } from "./dataset/Datasets.ts"
@@ -308,7 +308,7 @@ const postmortemSmokeCommand = Command.make(
     cases: Flag.Int("cases").pipe(Flag.withDescription("How many smoke fault cases to draft for"), Flag.withDefault(3)),
     out: Flag.String("out").pipe(
       Flag.withDescription("Where the drafts and verdicts are written, for a person to read"),
-      Flag.withDefault(`${packageRoot}/output/postmortem-smoke.json`),
+      Flag.withDefault(`${packageRoot}output/postmortem-smoke.json`),
     ),
     yes: Flag.Boolean("yes").pipe(Flag.withDescription("Confirm the Claude API spend"), Flag.withDefault(false)),
   },
@@ -331,7 +331,11 @@ const postmortemSmokeCommand = Command.make(
     // A run that failed half way reports less than it spent; keep the estimate rather than under-count.
     const measured = rows.reduce((sum, r) => sum + r.costUsd, 0)
     yield* guard.settle(label, rows.some((r) => r.error !== undefined) ? Math.max(measured, estimate) : measured)
+    // The verdicts first: they cost money to get and must not be lost to a file that cannot be written.
+    const report = reportPostmortemSmoke(rows)
+    for (const text of report.lines) yield* Console.log(text)
     const fs = yield* FileSystem.FileSystem
+    yield* fs.makeDirectory((yield* Path.Path).dirname(out), { recursive: true })
     yield* fs.writeFileString(
       out,
       `${JSON.stringify(
@@ -345,8 +349,6 @@ const postmortemSmokeCommand = Command.make(
         2,
       )}\n`,
     )
-    const report = reportPostmortemSmoke(rows)
-    for (const text of report.lines) yield* Console.log(text)
     yield* Console.log(`drafts written to ${out}`)
     if (!report.pass) return yield* new GateFailed({ message: "the postmortem smoke did not pass" })
   }),

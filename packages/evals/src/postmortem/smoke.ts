@@ -86,6 +86,22 @@ export class PostmortemSource extends Context.Service<
             params: { id },
             payload: new Feedback({ rating: "down", actualRootCause: truth.rootCause }),
           })
+          // The api writes a postmortem only once nothing is waiting for approval. Rejecting is the decision that
+          // runs nothing; it also means a draft that reports an action as carried out has made it up.
+          if (done.status === "awaiting_approval") {
+            const proposals = yield* client.investigations.proposals({ params: { id } })
+            yield* Effect.forEach(
+              proposals.filter((p) => p.status === "pending"),
+              (p) => client.proposals.decide({ params: { id: p.id }, payload: { decision: "rejected" } }),
+              { discard: true },
+            )
+            yield* client.investigations
+              .get({ params: { id } })
+              .pipe(
+                Effect.repeat({ schedule: Schedule.spaced("500 millis"), until: (inv) => inv.status === "completed" }),
+                Effect.timeout(Duration.seconds(30)),
+              )
+          }
           const written = yield* client.investigations.generatePostmortem({ params: { id } })
           return {
             investigationStatus: done.status,
