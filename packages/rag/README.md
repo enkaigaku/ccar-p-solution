@@ -55,6 +55,7 @@ const RagLive = Layer.mergeAll(RetrieverLive, IngestorLive).pipe(
 ```bash
 pnpm --filter @incident/rag rag ingest            # 重建 corpus/ → 评估 → 门禁通过才激活
 pnpm --filter @incident/rag rag ingest --offline  # 不调用 Voyage，只验证 SQL 路径
+pnpm --filter @incident/rag rag ingest --also ../../infra/.api-state/corpus  # 连同 api 发布的复盘一起重建（ADR 011）
 pnpm --filter @incident/rag rag eval              # 评估当前版本
 pnpm --filter @incident/rag rag versions          # 列出版本
 pnpm --filter @incident/rag rag activate <version> # 激活 / 回滚

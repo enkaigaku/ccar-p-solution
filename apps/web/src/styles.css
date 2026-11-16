@@ -291,7 +291,8 @@ tbody tr:last-child td {
 .severity-critical,
 .status-failed,
 .proposal-status-rejected,
-.proposal-status-failed {
+.proposal-status-failed,
+.postmortem-status-rejected {
   color: var(--critical);
   border-color: var(--critical);
 }
@@ -299,7 +300,8 @@ tbody tr:last-child td {
 .severity-warning,
 .status-awaiting_approval,
 .status-insufficient_information,
-.proposal-status-pending {
+.proposal-status-pending,
+.postmortem-status-draft {
   color: var(--warning-text);
   background: var(--warning-bg);
   border-color: transparent;
@@ -314,7 +316,8 @@ tbody tr:last-child td {
 
 .status-completed,
 .proposal-status-approved,
-.proposal-status-executed {
+.proposal-status-executed,
+.postmortem-status-published {
   color: var(--ok);
   border-color: var(--ok);
 }
@@ -520,6 +523,37 @@ tbody tr:last-child td {
 }
 
 .feedback button[type="submit"] {
+  justify-self: start;
+}
+
+.postmortem {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.postmortem header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.postmortem-fields {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.postmortem-fields dt {
+  color: var(--muted);
+}
+
+.postmortem-fields dd {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.postmortem button.primary {
   justify-self: start;
 }
 

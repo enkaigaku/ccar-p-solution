@@ -1,10 +1,20 @@
-import type { ActionProposal, Decision, Feedback, Investigation } from "@incident/contracts"
+import type {
+  ActionProposal,
+  Decision,
+  Feedback,
+  Investigation,
+  PostmortemBody,
+  PostmortemDecision,
+  PostmortemDraft,
+} from "@incident/contracts"
 import { InvestigationId } from "@incident/contracts"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { Effect } from "effect"
+import { useState } from "react"
 import { ConnectionIndicator, StatusBadge } from "../components/Badges.tsx"
 import { FeedbackForm } from "../components/FeedbackForm.tsx"
 import { Hypotheses } from "../components/Hypotheses.tsx"
+import { PostmortemPanel } from "../components/PostmortemPanel.tsx"
 import { ProposalCard } from "../components/ProposalCard.tsx"
 import { Timeline } from "../components/Timeline.tsx"
 import { isLowConfidence, isTerminal } from "../investigation/live.ts"
@@ -23,6 +33,10 @@ export const Route = createFileRoute("/investigations/$id")({
         return yield* Effect.all({
           investigation: client.investigations.get({ params: { id } }),
           proposals: client.investigations.proposals({ params: { id } }),
+          // Most investigations have no postmortem yet; that is not a failure of the page.
+          postmortem: client.investigations
+            .postmortem({ params: { id } })
+            .pipe(Effect.catchTag("PostmortemNotFound", () => Effect.succeed(undefined))),
         })
       }),
     ),
@@ -41,19 +55,29 @@ function InvestigationRoute() {
       </main>
     )
   }
-  const { investigation, proposals } = loaded.value
+  const { investigation, proposals, postmortem } = loaded.value
   // Keyed so navigating to another investigation starts a fresh live state and stream.
-  return <InvestigationPage key={investigation.id} investigation={investigation} proposals={proposals} />
+  return (
+    <InvestigationPage
+      key={investigation.id}
+      investigation={investigation}
+      proposals={proposals}
+      postmortem={postmortem}
+    />
+  )
 }
 
 function InvestigationPage({
   investigation,
   proposals,
+  postmortem: loadedPostmortem,
 }: {
   investigation: Investigation
   proposals: ReadonlyArray<ActionProposal>
+  postmortem: PostmortemDraft | undefined
 }) {
   const [state, dispatch, reconnect] = useLiveInvestigation(investigation, proposals)
+  const [postmortem, setPostmortem] = useState(loadedPostmortem)
   const principal = useSession()
   const lowConfidence = isLowConfidence(state.status, state.hypotheses)
   const current = state.investigation
@@ -85,6 +109,15 @@ function InvestigationPage({
     run(
       IncidentClient.use((client) => client.investigations.feedback({ params: { id: current.id }, payload: feedback })),
     )
+
+  const generatePostmortem = () =>
+    run(IncidentClient.use((client) => client.investigations.generatePostmortem({ params: { id: current.id } })))
+
+  const savePostmortem = (id: PostmortemDraft["id"], body: PostmortemBody) =>
+    run(IncidentClient.use((client) => client.postmortems.edit({ params: { id }, payload: body })))
+
+  const reviewPostmortem = (id: PostmortemDraft["id"], decision: PostmortemDecision) =>
+    run(IncidentClient.use((client) => client.postmortems.review({ params: { id }, payload: { decision } })))
 
   return (
     <main className="page investigation">
@@ -183,6 +216,22 @@ function InvestigationPage({
             ) : (
               <p className="empty">调查结束后可以在这里评价报告并填写实际根因。</p>
             )}
+          </section>
+
+          <section aria-labelledby="postmortem-heading">
+            <h2 id="postmortem-heading">复盘</h2>
+            <PostmortemPanel
+              // Keyed by id: regenerating replaces the draft, and the form must start from the new text.
+              key={postmortem?.id ?? "none"}
+              postmortem={postmortem}
+              finished={state.status === "completed" || state.status === "insufficient_information"}
+              canDraft={can(principal, "responder")}
+              canReview={can(principal, "approver")}
+              generate={generatePostmortem}
+              save={savePostmortem}
+              review={reviewPostmortem}
+              onChanged={setPostmortem}
+            />
           </section>
         </div>
       </div>

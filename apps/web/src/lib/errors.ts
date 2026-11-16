@@ -6,6 +6,18 @@ const messages: Record<string, (error: object) => string> = {
   ProposalNotFound: () => "找不到这张审批单",
   ProposalNotPending: (e) =>
     Predicate.hasProperty(e, "status") ? `审批单已经处理过（当前状态：${String(e.status)}）` : "审批单已经处理过",
+  PostmortemNotFound: () => "找不到这篇复盘（可能已被别人修改或重新生成，请刷新页面后再操作）",
+  PostmortemNotDraft: (e) =>
+    Predicate.hasProperty(e, "status")
+      ? `复盘已经审核过，不能再修改（当前状态：${String(e.status)}）`
+      : "复盘已经审核过，不能再修改",
+  InvestigationNotFinished: () => "调查还没有结束，不能生成复盘",
+  PostmortemUnavailable: (e) =>
+    Predicate.hasProperty(e, "reason") && e.reason === "ingest"
+      ? "写入知识库失败，草稿没有变化，可以稍后重试"
+      : Predicate.hasProperty(e, "reason") && e.reason === "refusal"
+        ? "模型拒绝了这次生成，没有产生草稿"
+        : "复盘草稿生成失败，请稍后重试",
   Unauthorized: () => "尚未登录或登录已过期。如果没有自动跳转，请打开 /auth/login 重新登录",
   Forbidden: (e) =>
     Predicate.hasProperty(e, "required")

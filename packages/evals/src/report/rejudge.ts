@@ -29,6 +29,8 @@ export interface RejudgedRow {
   readonly status: string
   readonly fault: string
   readonly distractor: boolean
+  /** A case curated from online feedback (ADR 011); summarized apart from the fault and adversarial sets. */
+  readonly feedback: boolean
   /** False for cases without a labelled root cause; they stay out of the accuracy figures. */
   readonly graded: boolean
   readonly rank: number | undefined
@@ -48,6 +50,8 @@ export interface RejudgeSummary {
   readonly all: Accuracy
   readonly withDistractor: Accuracy
   readonly withoutDistractor: Accuracy
+  /** Feedback cases only. Never part of `all`: the two sets are not comparable. */
+  readonly feedback: Accuracy
   readonly statuses: Readonly<Record<string, number>>
   readonly latencyMs: { readonly mean: number; readonly p95: number }
   readonly agentCostUsd: number
@@ -65,8 +69,10 @@ export const rejudge = Effect.fn("evals.rejudge")(function* (results: PromptfooR
       const truth = c.groundTruth
       const base = {
         caseId: c.id,
-        fault: truth === undefined ? "" : `${truth.fault.flag}=${truth.fault.variant}`,
-        distractor: (truth?.distractors ?? []).length > 0,
+        // Feedback cases have no injected flag; they are listed by where they came from.
+        fault: truth === undefined ? "" : "fault" in truth ? `${truth.fault.flag}=${truth.fault.variant}` : "feedback",
+        distractor: truth !== undefined && "distractors" in truth && (truth.distractors ?? []).length > 0,
+        feedback: c.kind === "feedback",
       }
       const output = row.response?.output
       if (output === undefined || output === null) {
@@ -111,7 +117,8 @@ const percentile = (values: ReadonlyArray<number>, p: number): number => {
 }
 
 export const summarize = (rows: ReadonlyArray<RejudgedRow>): RejudgeSummary => {
-  const graded = rows.filter((r) => r.graded)
+  const labelled = rows.filter((r) => r.graded)
+  const graded = labelled.filter((r) => !r.feedback)
   const ran = rows.filter((r) => r.status !== "error")
   const statuses: Record<string, number> = {}
   for (const r of rows) statuses[r.status] = (statuses[r.status] ?? 0) + 1
@@ -120,6 +127,7 @@ export const summarize = (rows: ReadonlyArray<RejudgedRow>): RejudgeSummary => {
     all: accuracy(graded),
     withDistractor: accuracy(graded.filter((r) => r.distractor)),
     withoutDistractor: accuracy(graded.filter((r) => !r.distractor)),
+    feedback: accuracy(labelled.filter((r) => r.feedback)),
     statuses,
     latencyMs: {
       mean: ran.length === 0 ? 0 : ran.reduce((total, r) => total + r.latencyMs, 0) / ran.length,
@@ -130,7 +138,7 @@ export const summarize = (rows: ReadonlyArray<RejudgedRow>): RejudgeSummary => {
     },
     agentCostUsd: sum((r) => r.agentCostUsd),
     judgeCostUsd: sum((r) => r.judgeCostUsd),
-    misses: graded.filter((r) => r.rank === undefined || r.rank > 3),
+    misses: labelled.filter((r) => r.rank === undefined || r.rank > 3),
   }
 }
 
@@ -142,6 +150,7 @@ export const renderSummary = (s: RejudgeSummary): ReadonlyArray<string> => [
   line("all cases", s.all),
   line("without distractor", s.withoutDistractor),
   line("with distractor", s.withDistractor),
+  ...(s.feedback.cases === 0 ? [] : [line("feedback cases (not comparable with the above)", s.feedback)]),
   `statuses: ${Object.entries(s.statuses)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([status, n]) => `${status} ${n}`)

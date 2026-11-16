@@ -1,9 +1,11 @@
 /**
  * Index maintenance CLI. Needs DATABASE_URL, and VOYAGE_API_KEY unless --offline is given.
  *
- *   node scripts/rag.ts ingest [--offline] [--corpus DIR] [--set FILE] [--force]
+ *   node scripts/rag.ts ingest [--offline] [--corpus DIR] [--also DIR] [--set FILE] [--force]
  *       Rebuild from the corpus, evaluate the candidate and the active index on the retrieval set,
  *       and activate the candidate only if the gate passes (recall@8 ≥ 0.85, drop ≤ 5 points).
+ *       --also adds a second corpus directory, for example the postmortems the api published
+ *       (infra/.api-state/corpus, ADR 011). Without it a rebuild drops them from the index.
  *   node scripts/rag.ts eval [--offline] [--set FILE]     Evaluate the active index.
  *   node scripts/rag.ts versions                          List index versions.
  *   node scripts/rag.ts activate VERSION                  Activate (or roll back to) a version.
@@ -36,6 +38,7 @@ const { values, positionals } = parseArgs({
     offline: { type: "boolean", default: false },
     force: { type: "boolean", default: false },
     corpus: { type: "string", default: new URL("../corpus", import.meta.url).pathname },
+    also: { type: "string" },
     set: { type: "string", default: new URL("../eval/retrieval-seed.json", import.meta.url).pathname },
   },
 })
@@ -76,7 +79,10 @@ const evaluateVersion = (version: string) =>
 
 const ingest = Effect.gen(function* () {
   const index = yield* RagIndex
-  const docs = yield* loadCorpus(values.corpus)
+  const docs = [
+    ...(yield* loadCorpus(values.corpus)),
+    ...(values.also === undefined ? [] : yield* loadCorpus(values.also)),
+  ]
   const active = yield* index.activeVersion
   const report = yield* index.rebuild(docs)
   yield* Console.log(

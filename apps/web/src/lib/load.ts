@@ -9,7 +9,12 @@ export type Loaded<A> =
   | { readonly _tag: "Ok"; readonly value: A }
   | { readonly _tag: "Failed"; readonly message: string; readonly notFound: boolean }
 
-const NOT_FOUND_TAGS: ReadonlySet<unknown> = new Set(["InvestigationNotFound", "AlertNotFound", "ProposalNotFound"])
+const NOT_FOUND_TAGS: ReadonlySet<unknown> = new Set([
+  "InvestigationNotFound",
+  "AlertNotFound",
+  "ProposalNotFound",
+  "PostmortemNotFound",
+])
 
 const LOGIN_REDIRECT_KEY = "incident.sentToLogin"
 

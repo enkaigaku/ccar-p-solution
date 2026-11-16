@@ -17,6 +17,7 @@ const row = (overrides: Partial<RejudgedRow>): RejudgedRow => ({
   status: "completed",
   fault: "paymentFailure=50%",
   distractor: false,
+  feedback: false,
   graded: true,
   rank: 1,
   verdicts: ["match"],
@@ -90,6 +91,27 @@ describe("rejudge", () => {
     const text = renderSummary(summary).join("\n")
     assert.include(text, "all cases: top-1 1/4 (25.0%), top-3 2/4 (50.0%)")
     assert.include(text, "miss fc-00000004 paymentFailure=50% [insufficient_information] no hypotheses")
+  })
+
+  it("keeps feedback cases out of the baseline accuracy and reports them on their own line", () => {
+    const baseline = [row({ caseId: "fc-00000001", rank: 1 }), row({ caseId: "fc-00000002", rank: 2 })]
+    const summary = summarize([
+      ...baseline,
+      row({ caseId: "fb-00000001", fault: "feedback", feedback: true, rank: undefined, verdicts: [] }),
+      row({ caseId: "fb-00000002", fault: "feedback", feedback: true, rank: 1 }),
+    ])
+    // Promoting feedback must not move the figures the fault set is compared by.
+    assert.deepStrictEqual(summary.all, summarize(baseline).all)
+    assert.deepStrictEqual(summary.withoutDistractor, { cases: 2, top1: 1, top3: 2 })
+    assert.deepStrictEqual(summary.feedback, { cases: 2, top1: 1, top3: 1 })
+    assert.deepStrictEqual(
+      summary.misses.map((r) => r.caseId),
+      ["fb-00000001"],
+    )
+    const text = renderSummary(summary).join("\n")
+    assert.include(text, "all cases: top-1 1/2 (50.0%), top-3 2/2 (100.0%)")
+    assert.include(text, "feedback cases (not comparable with the above): top-1 1/2 (50.0%), top-3 1/2 (50.0%)")
+    assert.notInclude(renderSummary(summarize(baseline)).join("\n"), "feedback cases")
   })
 
   it("an empty run summarizes to zeros", () => {

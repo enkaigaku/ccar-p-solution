@@ -5,7 +5,6 @@ import {
   type AlertmanagerWebhook,
   AlertNotFound,
   type Decision,
-  type Feedback,
   Investigation,
   InvestigationId,
   InvestigationNotFound,
@@ -20,10 +19,9 @@ interface State {
   readonly alerts: ReadonlyMap<AlertId, Alert>
   readonly investigations: ReadonlyMap<InvestigationId, Investigation>
   readonly proposals: ReadonlyMap<ProposalId, ActionProposal>
-  readonly feedback: ReadonlyMap<InvestigationId, ReadonlyArray<Feedback>>
 }
 
-const emptyState: State = { alerts: new Map(), investigations: new Map(), proposals: new Map(), feedback: new Map() }
+const emptyState: State = { alerts: new Map(), investigations: new Map(), proposals: new Map() }
 
 /** Fields the orchestrator changes while an investigation runs; `updatedAt` is set by the store. */
 export type InvestigationPatch = Partial<
@@ -39,8 +37,8 @@ const toSeverity = (label: string | undefined): Severity =>
   label === "critical" || label === "warning" ? label : "info"
 
 /**
- * In-memory persistence. A Postgres-backed layer with the same interface replaces it once the business and audit
- * tables land; until then a restart forgets alerts and investigations.
+ * In-memory persistence of alerts, investigations and proposals: a restart forgets them. Feedback and postmortems
+ * have their own stores (`FeedbackStore`, `PostmortemStore`), which are Postgres-backed when a database is set.
  */
 export class IncidentStore extends Context.Service<
   IncidentStore,
@@ -58,8 +56,6 @@ export class IncidentStore extends Context.Service<
       patch: InvestigationPatch,
     ): Effect.Effect<Investigation, InvestigationNotFound>
     listProposals(id: InvestigationId): Effect.Effect<ReadonlyArray<ActionProposal>, InvestigationNotFound>
-    addFeedback(id: InvestigationId, feedback: Feedback): Effect.Effect<void, InvestigationNotFound>
-    listFeedback(id: InvestigationId): Effect.Effect<ReadonlyArray<Feedback>, InvestigationNotFound>
     addProposal(proposal: ActionProposal): Effect.Effect<void, InvestigationNotFound>
     getProposal(id: ProposalId): Effect.Effect<ActionProposal, ProposalNotFound>
     /** Records a human decision on a pending proposal; `decidedBy` is the approver's display name. */
@@ -193,20 +189,6 @@ export class IncidentStore extends Context.Service<
           requireInvestigation(id).pipe(
             Effect.andThen(Ref.get(state)),
             Effect.map((s) => [...s.proposals.values()].filter((p) => p.investigationId === id)),
-          ),
-        addFeedback: (id, feedback) =>
-          requireInvestigation(id).pipe(
-            Effect.andThen(
-              Ref.update(state, (s) => ({
-                ...s,
-                feedback: new Map([...s.feedback, [id, [...(s.feedback.get(id) ?? []), feedback]]]),
-              })),
-            ),
-          ),
-        listFeedback: (id) =>
-          requireInvestigation(id).pipe(
-            Effect.andThen(Ref.get(state)),
-            Effect.map((s) => s.feedback.get(id) ?? []),
           ),
         addProposal: (proposal) =>
           requireInvestigation(proposal.investigationId).pipe(

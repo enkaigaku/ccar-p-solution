@@ -20,14 +20,17 @@ judge 分数只有在校准通过后才作数：`datasets/calibration/` 有 30 �
 ```
 datasets/fault/          故障集（录制产生，人工复核 groundTruth）
 datasets/adversarial/    对抗集：引用某个故障快照，回放前注入载荷、换告警或删掉证据，无需额外录制
+datasets/feedback/       反馈用例：线上反馈里的实际根因 + 当时的工具调用（`evals curate` / `promote`）
 datasets/retrieval/      检索集（等 packages/rag 的语料入库后补齐约 100 条）
 datasets/calibration/    judge 校准样本
 fixtures/replay/<id>/    ReplaySnapshot（格式定义在 @incident/contracts）
 src/promptfoo/           provider、断言、测试集生成、预算钩子
 src/record/              flagd 注入、MCP 客户端、录制器、故障场景目录
+src/feedback/            把反馈整理成候选用例、复核后提升进数据集
+candidates/              待复核的候选（不进 git）
 ```
 
-用例 id 一律是不透明的（`fc-xxxxxxxx`、`ad-xxxxxxxx`），标准根因只在用例文件里，不进快照，避免答案泄漏给 agent。`synthetic: true` 的用例是手写的测试夹具，只在 `EVAL_INCLUDE_SYNTHETIC=true` 时参与评估。
+用例 id 一律是不透明的（`fc-xxxxxxxx`、`ad-xxxxxxxx`、`fb-xxxxxxxx`），标准根因只在用例文件里，不进快照，避免答案泄漏给 agent。`synthetic: true` 的用例是手写的测试夹具，只在 `EVAL_INCLUDE_SYNTHETIC=true` 时参与评估。
 
 ## 对抗集
 
@@ -110,6 +113,30 @@ src/record/              flagd 注入、MCP 客户端、录制器、故障场景
 - 服务级 p95 会被占比小的慢 span 稀释，也会被 flagd 的长连接 span（`flagd.evaluation.v2.Service/EventStream`，约 10 分钟）污染。延迟类场景的触发查询因此按具体 span 过滤（`spanP95`）。每个服务还会录三条 `query_metrics` 工具说明里推荐的延迟查询（`latencyQueries`）：只算 SERVER span 的 p95、按 span 名拆分的 p95，以及按被调用方拆分的出站调用 p95。最后一条来自网关 collector 的 service graph（单位是秒，上限 10 秒），因为 HTTP 的 CLIENT span 只以方法命名，checkout 调 email 和调 shipping 在 span 指标里都是 `POST`。
 - `adHighCpu` 不影响延迟，触发看 `jvm_cpu_recent_utilization`；`loadGeneratorFloodHomepage` 不影响延迟，触发看首页请求率；`imageSlowLoad` 的延迟加在 frontend-proxy 上，image-provider 和 frontend 的 p95 都不变。
 - `productCatalogFailure`、`kafkaQueueProblems`、`failedReadinessProbe` 在 docker compose 部署下没有任何可观测的变化（没有错误 span；核心 compose 不带 Kafka；没有组件响应 readiness probe），不在目录里。
+
+## 反馈用例（ADR 011）
+
+```bash
+pnpm --filter @incident/evals evals curate         # 不调用模型；候选写到 candidates/<id>/
+pnpm --filter @incident/evals evals promote <id>   # 复核后移入 datasets/feedback/ 和 fixtures/replay/
+```
+
+`curate` 取带「实际根因」的反馈（api 的 `GET /feedback`，或 `--feedback <file>`）和 api 审计日志里的 `tool_call` 记录，每个调查生成一个候选：快照是 agent 当时的工具调用，标准答案是响应者写的根因。已经在数据集或候选目录里的调查会跳过，可以每周对同一份输入重复跑。
+
+### 复盘提示的冒烟评估
+
+改了 `packages/prompts` 里的复盘提示（或复盘用的模型、effort）之后跑。需要 api 以回放模式运行（同「本机端到端验证」），每条用例跑一次调查、把标注的根因作为响应者反馈提交、生成复盘草稿，再由 Claude judge 判断草稿的「根因」一节是否就是响应者给的根因。
+
+```bash
+pnpm --filter @incident/evals evals postmortem-smoke          # 只打印用例数和估计花费
+EVAL_REPLAY_DIR=$PWD/.replay pnpm --filter @incident/evals evals postmortem-smoke --yes   # 3 条，约 1.2 美元
+```
+
+全部匹配才通过。草稿原文写到 `output/postmortem-smoke.json`（gitignore），处置是否臆造、行文是否合适没有校准过的 judge，需要人读。
+
+反馈用例是单独的一组：`eval:smoke` / `eval:full` 不选它们，用 `pnpm --filter @incident/evals eval:feedback` 单独跑（预算上按一次全量评估计）。`rejudge` 的汇总和 `gate` 把它们单列一行，不计入故障集的准确率，也不设准确率门禁；引用和安全规则照常要求 100%。
+
+这类用例和故障集不是同一种测量：快照只有 agent 当时问过的查询，prompt 改了以后换一种问法会拿到空结果。把它们上的回退当成线索去看，不要和故障集的分数混在一起比较。全量评估会包含它们（`synthetic: false`），冒烟评估不会（`smoke: false`）。
 
 ## 尚未打通的部分
 

@@ -23,15 +23,29 @@ GET /investigations/:id/events ──► SSE，id 为事件序号，支持 Last-
 
 ### 安全约束在代码里的位置
 
-| 规则                         | 实现                                                                                                                                                 |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| agent 只有只读工具和提议工具 | `agent/tools.ts`：只放行 `ObservabilityTools` 里的工具名，另加 `search_knowledge`、`propose_action`；有测试断言工具列表                              |
-| mcp-ops 只给审批执行器       | 只有 `ApprovalExecutor` 依赖 `OpsGateway`；签名密钥只在 api 与 mcp-ops 之间共享                                                                      |
-| 工具结果是不可信数据         | `prompting.ts` 的 `untrusted()`：包在 `<untrusted-data>` 里，`<` 转义，系统提示声明其为数据                                                          |
-| 原文只进审计                 | `audit/AuditLog.ts`：提示、模型输出、工具结果原文写 JSONL（按 trace id 关联），span 上只有哈希                                                       |
-| 请求必须认证（ADR 010）      | `auth/TokenVerifier.ts` 校验访问令牌（签名、算法、`iss`、`aud`、有效期）；`Http.ts` 的每个 handler 用 `requireRole` 校验角色；SSE 路由用同一个校验器 |
-| 审批人是登录用户             | `InvestigationRunner.decide` 把 `Principal.subject` 写进 `ApprovalToken.approver` 和审计，`Principal.name` 写进 `ActionProposal.decidedBy`           |
-| 密钥                         | 只从环境变量读；spawn 的 MCP server 只拿到白名单内的变量（mcp-observability 拿不到任何密钥）                                                         |
+| 规则                         | 实现                                                                                                                                                        |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| agent 只有只读工具和提议工具 | `agent/tools.ts`：只放行 `ObservabilityTools` 里的工具名，另加 `search_knowledge`、`propose_action`；有测试断言工具列表                                     |
+| mcp-ops 只给审批执行器       | 只有 `ApprovalExecutor` 依赖 `OpsGateway`；签名密钥只在 api 与 mcp-ops 之间共享                                                                             |
+| 工具结果是不可信数据         | `prompting.ts` 的 `untrusted()`：包在 `<untrusted-data>` 里，`<` 转义，系统提示声明其为数据                                                                 |
+| 原文只进审计                 | `audit/AuditLog.ts`：提示、模型输出、工具结果原文写 JSONL（按 trace id 关联），span 上只有哈希                                                              |
+| 请求必须认证（ADR 010）      | `auth/TokenVerifier.ts` 校验访问令牌（签名、算法、`iss`、`aud`、有效期）；`Http.ts` 的每个 handler 用 `requireRole` 校验角色；SSE 路由用同一个校验器        |
+| 审批人是登录用户             | `InvestigationRunner.decide` 把 `Principal.subject` 写进 `ApprovalToken.approver` 和审计，`Principal.name` 写进 `ActionProposal.decidedBy`                  |
+| 模型写的复盘不能自己进知识库 | `postmortem/Postmortems.ts`：草稿只有 approver 的 `publish` 才会 ingest；正文是结构化字段，Markdown 由 api 渲染；发布写 `postmortem_review` 审计（ADR 011） |
+| 密钥                         | 只从环境变量读；spawn 的 MCP server 只拿到白名单内的变量（mcp-observability 拿不到任何密钥）                                                                |
+
+### 反馈闭环（ADR 011）
+
+```
+POST /investigations/:id/feedback ─► FeedbackStore（Postgres api_feedback）：反馈 + 提交人 + 报告快照
+POST /investigations/:id/postmortem ─► Sonnet 5.5 起草（structured output）─► PostmortemStore：draft
+PUT  /postmortems/:id ─► 人工修改正文（修改后草稿换新 id，旧页面上的审核请求会 404）
+POST /postmortems/:id/review ─► publish：写 Markdown 文件 ─► Ingestor 增量入库并激活 ─► published
+                                reject：rejected，永不入库
+GET  /feedback ─► 已落库的反馈，供 `evals curate` 整理成评估用例
+```
+
+每次观测工具调用另写一条 `tool_call` 审计记录（输入 + 结构化输出，契约里的 `RecordedToolCall`），`evals curate` 用它重建回放快照。
 
 ### 提示缓存
 
@@ -43,17 +57,17 @@ GET /investigations/:id/events ──► SSE，id 为事件序号，支持 Last-
 AUTH_MODE=dev pnpm dev:api        # http://localhost:3000/docs，不认证
 ```
 
-没有 `ANTHROPIC_API_KEY`、`DATABASE_URL`、`APPROVAL_SIGNING_KEY` 时也能启动（控制台开发用），对应功能会失败并打 warning。认证没有这种降级：既没有 `OIDC_ISSUER` 也没有 `AUTH_MODE=dev` 时拒绝启动。
+没有 `ANTHROPIC_API_KEY`、`DATABASE_URL`、`APPROVAL_SIGNING_KEY` 时也能启动（控制台开发用），对应功能会失败并打 warning；没有 `DATABASE_URL` 时检索和入库用 stub，反馈和复盘草稿只在内存里。认证没有这种降级：既没有 `OIDC_ISSUER` 也没有 `AUTH_MODE=dev` 时拒绝启动。
 
 ### 认证与角色
 
-| 端点                                                                | 角色       |
-| ------------------------------------------------------------------- | ---------- |
-| `GET /health`、`POST /alerts/webhook`                               | 不需要认证 |
-| `GET /session`                                                      | 已登录即可 |
-| `GET /alerts`、`GET /investigations/:id`、`…/proposals`、`…/events` | viewer     |
-| `POST /investigations`、`POST /investigations/:id/feedback`         | responder  |
-| `POST /proposals/:id/decision`                                      | approver   |
+| 端点                                                                                                                       | 角色       |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `GET /health`、`POST /alerts/webhook`                                                                                      | 不需要认证 |
+| `GET /session`                                                                                                             | 已登录即可 |
+| `GET /alerts`、`GET /investigations/:id`、`…/proposals`、`…/events`、`…/postmortem`、`GET /feedback`                       | viewer     |
+| `POST /investigations`、`POST /investigations/:id/feedback`、`POST /investigations/:id/postmortem`、`PUT /postmortems/:id` | responder  |
+| `POST /proposals/:id/decision`、`POST /postmortems/:id/review`                                                             | approver   |
 
 api 只接受 `Authorization: Bearer <访问令牌>`，不处理登录流程和 cookie；令牌由 web 的 `/api` 代理附上。ID token 的 `aud` 是 web 客户端，会被拒绝。
 

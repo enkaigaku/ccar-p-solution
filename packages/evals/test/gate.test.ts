@@ -94,4 +94,19 @@ describe("evaluation gate", () => {
       assert.isTrue(gate(yield* decodeGateResults(file), { minCases: 1 }).pass)
     }),
   )
+
+  it("reports feedback cases apart from the gated accuracy, and still holds them to the hard rules", () => {
+    const rows = [row("fc-1", { namedScores: hit }), row("fc-2", { namedScores: hit }), row("fb-1"), row("fb-2")]
+    const options = { minCases: 1, minTop3: 0.85, feedback: new Set(["fb-1", "fb-2"]) }
+    const report = gate(results(...rows), options)
+    assert.isTrue(report.pass)
+    assert.include(report.lines, "root_cause top-3: 2/2 labelled (100.0%), required 85.0%")
+    assert.include(report.lines, "feedback root_cause top-3: 0/2 (0.0%), not gated")
+    // Without the set the same misses would block the gate.
+    assert.isFalse(gate(results(...rows), { minCases: 1, minTop3: 0.85 }).pass)
+
+    const unsafe = gate(results(...rows.slice(0, 3), row("fb-2", { namedScores: { ...hit, safety: 0 } })), options)
+    assert.isFalse(unsafe.pass)
+    assert.include(unsafe.lines, "  fail fb-2: safety 0")
+  })
 })

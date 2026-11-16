@@ -1,12 +1,19 @@
 import { NodeHttpClient, NodeRuntime, NodeServices } from "@effect/platform-node"
 import { ReplaySnapshot } from "@incident/contracts"
-import { Console, DateTime, Duration, Effect, FileSystem, Layer, Option } from "effect"
+import { Console, DateTime, Duration, Effect, FileSystem, Layer, Option, Path } from "effect"
 import { Argument, Command, Flag } from "effect/cli"
 import { BudgetGuard, BudgetPolicy } from "./budget/Budget.ts"
 import { Datasets, packageRoot } from "./dataset/Datasets.ts"
 import { materializeSnapshot } from "./dataset/materialize.ts"
+import { defaultCandidatesDir, runCurate, runPromote } from "./feedback/commands.ts"
 import { calibrate } from "./judge/calibration.ts"
 import { Judge, RubricVersion } from "./judge/Judge.ts"
+import {
+  estimatePostmortemSmokeUsd,
+  PostmortemSource,
+  reportPostmortemSmoke,
+  runPostmortemSmoke,
+} from "./postmortem/smoke.ts"
 import { backfillLatency } from "./record/backfill.ts"
 import { Flagd } from "./record/Flagd.ts"
 import { ObservabilityMcp } from "./record/ObservabilityMcp.ts"
@@ -250,7 +257,8 @@ const gateCommand = Command.make(
     const results = yield* decodeGateResults(yield* (yield* FileSystem.FileSystem).readFileString(file))
     const cases = yield* (yield* Datasets).cases
     const unlabelled = new Set(cases.filter((c) => c.groundTruth === undefined).map((c) => c.id))
-    const report = gate(results, { minCases, minTop3: Option.getOrUndefined(minTop3), unlabelled })
+    const feedback = new Set(cases.filter((c) => c.kind === "feedback").map((c) => c.id))
+    const report = gate(results, { minCases, minTop3: Option.getOrUndefined(minTop3), unlabelled, feedback })
     for (const text of report.lines) yield* Console.log(text)
     if (!report.pass) return yield* new GateFailed({ message: `${file} did not pass the evaluation gate` })
   }),
@@ -259,8 +267,112 @@ const gateCommand = Command.make(
   Command.provide(Datasets.layerAt(packageRoot)),
 )
 
+const candidatesFlag = Flag.String("candidates").pipe(
+  Flag.withDescription("Directory where candidates wait for review"),
+  Flag.withDefault(defaultCandidatesDir),
+)
+
+const curateCommand = Command.make(
+  "curate",
+  {
+    feedback: Flag.String("feedback").pipe(
+      Flag.withDescription("A JSON file saved from GET /feedback; omit to ask the api at EVAL_API_URL"),
+      Flag.optional,
+    ),
+    audit: Flag.String("audit").pipe(
+      Flag.withDescription("The api's audit log (JSONL)"),
+      Flag.withDefault(`${repoRoot}infra/.api-state/audit.jsonl`),
+    ),
+    candidates: candidatesFlag,
+  },
+  ({ feedback, audit, candidates }) => runCurate({ feedback, audit, out: candidates }),
+).pipe(
+  Command.withDescription(
+    "Turn stored feedback that names an actual root cause into candidate cases (free: calls no model)",
+  ),
+  Command.provide(Datasets.layerAt(packageRoot)),
+)
+
+const promoteCommand = Command.make(
+  "promote",
+  {
+    id: Argument.String("case").pipe(Argument.withDescription("A candidate's case id, as printed by `curate`")),
+    candidates: candidatesFlag,
+  },
+  ({ id, candidates }) => runPromote({ id, from: candidates, root: packageRoot }),
+).pipe(Command.withDescription("Add a reviewed candidate to the dataset (datasets/feedback, fixtures/replay)"))
+
+const postmortemSmokeCommand = Command.make(
+  "postmortem-smoke",
+  {
+    cases: Flag.Int("cases").pipe(Flag.withDescription("How many smoke fault cases to draft for"), Flag.withDefault(3)),
+    out: Flag.String("out").pipe(
+      Flag.withDescription("Where the drafts and verdicts are written, for a person to read"),
+      Flag.withDefault(`${packageRoot}output/postmortem-smoke.json`),
+    ),
+    yes: Flag.Boolean("yes").pipe(Flag.withDescription("Confirm the Claude API spend"), Flag.withDefault(false)),
+  },
+  Effect.fn(function* ({ cases, out, yes }) {
+    const datasets = yield* Datasets
+    const selected = (yield* datasets.cases)
+      .flatMap((c) => (c.kind === "fault" && c.smoke && !c.synthetic ? [c] : []))
+      .slice(0, cases)
+    const estimate = estimatePostmortemSmokeUsd(selected.length)
+    if (!yes) return yield* Console.log(`${selected.length} cases, about $${estimate.toFixed(2)}; rerun with --yes`)
+    const guard = yield* BudgetGuard
+    const label = `postmortem-smoke:${DateTime.formatIso(yield* DateTime.now)}:${selected.length}`
+    yield* guard.reserve("smoke", estimate, label)
+    const inputs = yield* Effect.forEach(selected, (c) =>
+      Effect.map(datasets.snapshot(c.snapshotId), (snapshot) => ({ case: c, truth: c.groundTruth, snapshot })),
+    )
+    const rows = yield* runPostmortemSmoke(inputs).pipe(
+      Effect.provide(Layer.mergeAll(PostmortemSource.layerApi, Judge.layerClaude)),
+    )
+    // A run that failed half way reports less than it spent; keep the estimate rather than under-count.
+    const measured = rows.reduce((sum, r) => sum + r.costUsd, 0)
+    yield* guard.settle(label, rows.some((r) => r.error !== undefined) ? Math.max(measured, estimate) : measured)
+    // The verdicts first: they cost money to get and must not be lost to a file that cannot be written.
+    const report = reportPostmortemSmoke(rows)
+    for (const text of report.lines) yield* Console.log(text)
+    const fs = yield* FileSystem.FileSystem
+    yield* fs.makeDirectory((yield* Path.Path).dirname(out), { recursive: true })
+    yield* fs.writeFileString(
+      out,
+      `${JSON.stringify(
+        rows.map(({ draft, ...row }) => ({
+          ...row,
+          body: draft?.body,
+          model: draft?.model,
+          promptVersion: draft?.promptVersion,
+        })),
+        null,
+        2,
+      )}\n`,
+    )
+    yield* Console.log(`drafts written to ${out}`)
+    if (!report.pass) return yield* new GateFailed({ message: "the postmortem smoke did not pass" })
+  }),
+).pipe(
+  Command.withDescription(
+    "Draft postmortems for a few smoke cases through the api and check the root cause (calls Claude)",
+  ),
+  Command.provide(Layer.mergeAll(BudgetGuard.layer, Datasets.layerAt(packageRoot))),
+)
+
 Command.make("evals").pipe(
-  Command.withSubcommands([budget, scenarios, record, scrub, backfill, calibrateCommand, rejudgeCommand, gateCommand]),
+  Command.withSubcommands([
+    budget,
+    scenarios,
+    record,
+    scrub,
+    backfill,
+    calibrateCommand,
+    rejudgeCommand,
+    gateCommand,
+    curateCommand,
+    promoteCommand,
+    postmortemSmokeCommand,
+  ]),
   Command.run({ version: "0.0.0" }),
   Effect.provide(NodeServices.layer),
   NodeRuntime.runMain,

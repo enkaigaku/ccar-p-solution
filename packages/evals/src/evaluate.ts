@@ -46,7 +46,7 @@ export interface CaseGrade {
 }
 
 export const gradeRootCause = Effect.fn("evals.gradeRootCause")(function* (c: EvalCase, run: AgentRun) {
-  const truth = c.kind === "fault" ? c.groundTruth : c.groundTruth
+  const truth = c.groundTruth
   if (truth === undefined) return undefined
   const judgement = yield* (yield* Judge).rootCause(
     truth,

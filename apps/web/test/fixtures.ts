@@ -5,6 +5,10 @@ import {
   Hypothesis,
   Investigation,
   InvestigationId,
+  InvestigationUsage,
+  PostmortemBody,
+  PostmortemDraft,
+  PostmortemId,
   ProposalId,
   ToggleFlag,
 } from "@incident/contracts"
@@ -44,5 +48,29 @@ export const proposal = (overrides: Partial<ConstructorParameters<typeof ActionP
     rollbackPlan: "Set the flag back to its previous variant",
     status: "pending",
     createdAt: t0,
+    ...overrides,
+  })
+
+export const postmortemBody = new PostmortemBody({
+  title: "Checkout failures caused by payment rejecting charges",
+  summary: "Checkout returned errors because payment rejected every charge.",
+  symptoms: "HighErrorRate fired for checkout.",
+  rootCause: "The paymentFailure flag was on.",
+  mitigation: "The flag was turned off.",
+})
+
+export const postmortem = (overrides: Partial<ConstructorParameters<typeof PostmortemDraft>[0]> = {}) =>
+  new PostmortemDraft({
+    id: PostmortemId.make("pm-1"),
+    investigationId,
+    status: "draft",
+    service: "checkout",
+    body: postmortemBody,
+    model: "claude-sonnet-5-5",
+    promptVersion: "postmortem@1",
+    usage: new InvestigationUsage({ costUsd: 0.02, inputTokens: 3000, outputTokens: 600 }),
+    edited: false,
+    createdAt: t0,
+    updatedAt: t0,
     ...overrides,
   })

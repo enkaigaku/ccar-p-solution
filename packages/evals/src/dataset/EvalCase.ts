@@ -96,7 +96,53 @@ export class AdversarialCase extends Schema.Class<AdversarialCase>("@incident/ev
   synthetic: Schema.Boolean,
 }) {}
 
-export const EvalCase = Schema.Union([FaultCase, AdversarialCase])
+/**
+ * The answer for a case that came from production feedback: what the responder said the root cause was.
+ * There is no injected flag, so unlike {@link GroundTruth} there is no `fault`.
+ */
+export const FeedbackTruth = Schema.Struct({
+  rootCause: Schema.NonEmptyString,
+  /** The service whose fault caused the alert. Curation fills in the alerting service; the reviewer corrects it. */
+  service: Schema.NonEmptyString,
+  acceptableAlternatives: Schema.Array(Schema.String),
+})
+export type FeedbackTruth = typeof FeedbackTruth.Type
+
+/** What the judge compares hypotheses against: the part every kind of ground truth has. */
+export type JudgedTruth = Pick<GroundTruth, "rootCause" | "service" | "acceptableAlternatives">
+
+/**
+ * A case curated from a live investigation (design doc "反馈闭环"): the telemetry the agent queried, replayed,
+ * with the responder's stated root cause as the answer. Written by `evals curate` as a candidate and added to
+ * the dataset by `evals promote` after a person reviewed it.
+ *
+ * The snapshot holds only the calls the agent made at the time, not the recorder's broad sweep, so a changed
+ * prompt that asks different questions gets empty answers. Treat a regression on these cases as a lead to look
+ * into, not as a measurement of the same quality as the fault set.
+ */
+export class FeedbackCase extends Schema.Class<FeedbackCase>("@incident/evals/FeedbackCase")({
+  kind: Schema.Literal("feedback"),
+  id: CaseId,
+  snapshotId: CaseId,
+  smoke: Schema.Boolean,
+  groundTruth: FeedbackTruth,
+  expect: Expectations,
+  tags: Schema.Array(Schema.String),
+  synthetic: Schema.Boolean,
+  /** Where the case came from. Never shown to the agent. */
+  origin: Schema.Struct({
+    feedbackId: Schema.String,
+    investigationId: Schema.String,
+    traceId: Schema.optionalKey(Schema.String),
+    rating: Schema.Literals(["up", "down"]),
+    /** What produced the report the feedback was about. */
+    model: Schema.String,
+    promptVersion: Schema.String,
+    indexVersion: Schema.String,
+  }),
+}) {}
+
+export const EvalCase = Schema.Union([FaultCase, AdversarialCase, FeedbackCase])
 export type EvalCase = typeof EvalCase.Type
 
 export class RetrievalCase extends Schema.Class<RetrievalCase>("@incident/evals/RetrievalCase")({

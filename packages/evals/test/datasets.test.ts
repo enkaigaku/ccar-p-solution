@@ -20,7 +20,7 @@ describe("committed datasets", () => {
       assert.strictEqual(new Set(cases.map((c) => c.id)).size, cases.length)
       for (const c of cases) {
         const snapshot = yield* snapshotFor(c)
-        if (c.kind === "fault") assert.strictEqual(snapshot.caseId, c.id, `${c.id} snapshot caseId`)
+        if (c.kind !== "adversarial") assert.strictEqual(snapshot.caseId, c.id, `${c.id} snapshot caseId`)
         // The answer must never be readable from what replay serves.
         if (c.kind === "fault" && !c.synthetic) {
           // Checked on the outputs: a scenario's own trigger query is an input and may name what it measures.

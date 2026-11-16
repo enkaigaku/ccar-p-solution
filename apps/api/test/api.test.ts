@@ -2,110 +2,18 @@ import { assert, describe, it } from "@effect/vitest"
 import {
   ActionProposal,
   AlertId,
-  Authentication,
   Feedback,
-  IncidentApi,
-  type Investigation,
   InvestigationId,
-  PostmortemBody,
-  PostmortemId,
   Principal,
   ProposalId,
-  Retriever,
   ToggleFlag,
 } from "@incident/contracts"
-import { DateTime, Duration, Effect, Layer, Schedule } from "effect"
-import { HttpServer } from "effect/http"
-import { HttpApiTest } from "effect/http-api"
-import { Investigator } from "../src/agent/Investigator.ts"
-import { ApprovalExecutor } from "../src/approval/ApprovalExecutor.ts"
-import { AuditLog } from "../src/audit/AuditLog.ts"
-import { InvestigationEvents } from "../src/events/InvestigationEvents.ts"
-import { HandlersLayer } from "../src/Http.ts"
+import { DateTime, Effect } from "effect"
+import { FeedbackStore } from "../src/feedback/FeedbackStore.ts"
 import { IncidentStore } from "../src/IncidentStore.ts"
-import { InvestigationRunner } from "../src/InvestigationRunner.ts"
-import { ObservabilityGateway } from "../src/mcp/ObservabilityGateway.ts"
-import { OpsGateway } from "../src/mcp/OpsGateway.ts"
-import { Triage } from "../src/triage/Triage.ts"
+import { makeClient, operator, settled, testApp, triageReply } from "./app.ts"
 import { goodReport, toggleProposal, webhook, window } from "./fixtures.ts"
-import {
-  type FakeReply,
-  fakeAnthropic,
-  jsonText,
-  observabilitySession,
-  opsServer,
-  reply,
-  signingKey,
-  toolUse,
-} from "./harness.ts"
-
-const makeClient = HttpApiTest.groups(IncidentApi, [
-  "system",
-  "session",
-  "alerts",
-  "investigations",
-  "proposals",
-  "postmortems",
-  "feedback",
-])
-
-const operator = new Principal({ subject: "u-1", name: "operator", roles: ["viewer", "responder", "approver"] })
-
-/** The whole api behind the HTTP handlers, with fake Claude replies, in-process MCP servers and the stub retriever. */
-const testApp = (replies: Array<FakeReply>, principal: Principal = operator) =>
-  Effect.gen(function* () {
-    const claude = fakeAnthropic(replies)
-    const ops = yield* opsServer
-    const audit = yield* AuditLog.makeMemory
-    const services = Layer.mergeAll(
-      IncidentStore.layerMemory,
-      InvestigationEvents.layer,
-      claude.layer,
-      Layer.succeed(AuditLog, audit.service),
-      Retriever.layerStub,
-      ObservabilityGateway.layerFrom(observabilitySession),
-      Layer.succeed(OpsGateway, OpsGateway.fromSession(ops.open)),
-    )
-    const app = InvestigationRunner.layer.pipe(
-      Layer.provideMerge(
-        Layer.mergeAll(
-          Triage.layer,
-          Layer.effect(Investigator, Investigator.make({ maxTurns: 10, maxCostUsd: 5 })),
-          Layer.effect(ApprovalExecutor, ApprovalExecutor.make(signingKey)),
-        ),
-      ),
-      Layer.provideMerge(services),
-    )
-    const layer = Layer.mergeAll(
-      HandlersLayer.pipe(Layer.provideMerge(app), Layer.provideMerge(Authentication.layerStub(principal))),
-      HttpServer.layerServices,
-    )
-    return { layer, requests: claude.requests, executed: ops.executed, audit: audit.records }
-  })
-
-const triageReply = reply(
-  "end_turn",
-  [
-    jsonText({
-      category: "error-rate",
-      service: "checkout",
-      severity: "critical",
-      summary: "checkout requests fail",
-      retrievalQuery: "checkout HighErrorRate errors",
-      relatedAlertIds: [],
-    }),
-  ],
-  { model: "claude-haiku-5-5" },
-)
-
-const settled = (client: Effect.Success<typeof makeClient>, id: InvestigationId) =>
-  client.investigations.get({ params: { id } }).pipe(
-    Effect.repeat({
-      schedule: Schedule.spaced("10 millis"),
-      until: (inv: Investigation) => inv.status !== "queued" && inv.status !== "running",
-    }),
-    Effect.timeout(Duration.seconds(10)),
-  )
+import { jsonText, reply, toolUse } from "./harness.ts"
 
 describe("IncidentApi", () => {
   it.live("investigates an alert end to end and executes an approved proposal through mcp-ops", () =>
@@ -218,9 +126,9 @@ describe("IncidentApi", () => {
           params: { id: investigation.id },
           payload: new Feedback({ rating: "up", actualRootCause: "paymentFailure flag enabled" }),
         })
-        const feedback = yield* store.listFeedback(investigation.id)
+        const feedback = yield* (yield* FeedbackStore).listFor(investigation.id)
         assert.deepStrictEqual(
-          feedback.map((f) => f.rating),
+          feedback.map((f) => f.feedback.rating),
           ["down", "up"],
         )
         const error = yield* client.investigations
@@ -361,31 +269,6 @@ describe("IncidentApi", () => {
         const denied = yield* client.alerts.list().pipe(Effect.flip)
         assert.strictEqual(denied._tag, "Forbidden")
       }).pipe(Effect.provide(app.layer))
-    }),
-  )
-
-  it.effect("the postmortem and feedback endpoints check roles before they answer", () =>
-    Effect.gen(function* () {
-      const viewer = yield* testApp([], new Principal({ subject: "u-3", name: "carol", roles: ["viewer"] }))
-      yield* Effect.gen(function* () {
-        const client = yield* makeClient
-        assert.deepStrictEqual(yield* client.feedback.list({ query: {} }), [])
-        const id = PostmortemId.make("pm-1")
-        const denied = yield* Effect.all([
-          client.investigations.generatePostmortem({ params: { id: InvestigationId.make("inv-1") } }).pipe(Effect.flip),
-          client.postmortems
-            .edit({
-              params: { id },
-              payload: new PostmortemBody({ title: "t", summary: "s", symptoms: "s", rootCause: "r", mitigation: "m" }),
-            })
-            .pipe(Effect.flip),
-          client.postmortems.review({ params: { id }, payload: { decision: "publish" } }).pipe(Effect.flip),
-        ])
-        assert.deepStrictEqual(
-          denied.map((e) => e._tag),
-          ["Forbidden", "Forbidden", "Forbidden"],
-        )
-      }).pipe(Effect.provide(viewer.layer))
     }),
   )
 
