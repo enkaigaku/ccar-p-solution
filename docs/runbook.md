@@ -18,6 +18,8 @@ Incident Copilot 自身的日常操作和排障。整套环境跑在开发者的
 
 web 的开发端口和 Grafana 都是 3001。两者同时运行时给 web 换一个端口，并把 `.env` 里的 `WEB_ORIGIN` 改成新地址；Keycloak 也读这个变量，改后要 `down` 再 `up`。
 
+Keycloak 的默认端口 8080 和 OpenTelemetry Demo 的 frontend-proxy 相同。两者同时运行时在 `.env` 里设 `KEYCLOAK_PORT`（例如 8081），并把 `OIDC_ISSUER` 里的端口改成同一个；下文出现的 `localhost:8080` 相应替换。
+
 ## 启动全套环境
 
 顺序有依赖：观测后端创建 demo 要接入的网络，所以必须先起。

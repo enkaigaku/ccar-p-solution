@@ -20,7 +20,9 @@ services:
       INCIDENT_DEMO_PASSWORD: ${KEYCLOAK_DEMO_PASSWORD:?set KEYCLOAK_DEMO_PASSWORD in .env}
       INCIDENT_WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3001}
     ports:
-      - "127.0.0.1:8080:8080"
+      # Host port; change KEYCLOAK_PORT when 8080 is taken (the OpenTelemetry Demo's frontend-proxy uses it), and
+      # keep the port in OIDC_ISSUER the same.
+      - "127.0.0.1:${KEYCLOAK_PORT:-8080}:8080"
     volumes:
       - ./incident-realm.json:/opt/keycloak/data/import/incident-realm.json:ro
     deploy:
