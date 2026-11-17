@@ -6,7 +6,7 @@ Incident Copilot 的 Web 控制台（TanStack Start 1.x，由官方脚手架 `@t
 
 ```bash
 AUTH_MODE=dev pnpm dev:api           # 另一个终端：apps/api 内存版（不认证），http://localhost:3000
-pnpm --filter @incident/web dev      # http://localhost:3001
+pnpm --filter @incident/web dev      # http://localhost:3001；端口用 WEB_PORT 改，WEB_ORIGIN 要同步
 ```
 
 这样启动没有登录：web 没有 `OIDC_ISSUER` 时不显示用户，代理不加令牌。要登录，按 `infra/README.md` 启动 Keycloak，并给 api 和 web 都设置 `OIDC_ISSUER`（web 还需要 `OIDC_CLIENT_SECRET`）。
