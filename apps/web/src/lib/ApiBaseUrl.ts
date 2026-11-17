@@ -1,4 +1,5 @@
 import { Context } from "effect"
+import { webPort } from "./WebPort.ts"
 
 /** Path prefix under which the web server proxies the Incident API (see `src/routes/api.$.ts`). */
 export const API_PREFIX = "/api"
@@ -11,5 +12,7 @@ export const API_PREFIX = "/api"
  */
 export const ApiBaseUrl = Context.Reference<string>("@incident/web/ApiBaseUrl", {
   defaultValue: () =>
-    typeof location === "undefined" ? `http://localhost:3001${API_PREFIX}` : `${location.origin}${API_PREFIX}`,
+    typeof location === "undefined"
+      ? `http://localhost:${webPort(process.env.WEB_PORT)}${API_PREFIX}`
+      : `${location.origin}${API_PREFIX}`,
 })

@@ -16,7 +16,7 @@ Incident Copilot 自身的日常操作和排障。整套环境跑在开发者的
 | OpenTelemetry Demo         | 由 demo 自己的 compose 决定        | `infra/scripts/otel-demo.sh up`                                       |
 | mcp-observability、mcp-ops | 默认 stdio，由 api 按需启动        | 不用单独起                                                            |
 
-web 的开发端口和 Grafana 都是 3001。两者同时运行时给 web 换一个端口，并把 `.env` 里的 `WEB_ORIGIN` 改成新地址；Keycloak 也读这个变量，改后要 `down` 再 `up`。
+web 的开发端口和 Grafana 都是 3001。两者同时运行时在 `.env` 里设 `WEB_PORT`（例如 3002），并把 `WEB_ORIGIN` 改成同一个端口的地址；Keycloak 也读这个变量，改后要 `down` 再 `up`。
 
 Keycloak 的默认端口 8080 和 OpenTelemetry Demo 的 frontend-proxy 相同。两者同时运行时在 `.env` 里设 `KEYCLOAK_PORT`（例如 8081），并把 `OIDC_ISSUER` 里的端口改成同一个；下文出现的 `localhost:8080` 相应替换。
 
@@ -200,7 +200,7 @@ Grafana 的 4 条告警会送到 api 的 `/alerts/webhook`，所以系统可以�
 | 评估里 agent 说查不到数据                                       | 回放按 PromQL 逐字匹配，agent 自己写的查询命中不了录制，会得到工具错误。工具说明里新增了查询写法之后，用 `evals backfill` 给旧快照补录（前提是 Prometheus 还留着那段数据，本地保留 15 天）。       |
 | 真实评估一条都连不上 api                                        | api 必须以 `AUTH_MODE=dev` 启动（评估客户端不带访问令牌），而且 `OBS_REPLAY_DIR` 要和评估的 `EVAL_REPLAY_DIR` 是同一个目录的绝对路径。                                                             |
 | 预算守卫拒绝运行评估                                            | 当月全量次数用完（8 次），或加上本次估算会超过月度上限的 80%。不要绕过。冒烟不受 80% 规则限制，每月 50 次。换过机器的话账本是空的，用 `EVAL_MONTH_SPEND_USD` 带上已用金额。                        |
-| Grafana 和 web 抢 3001 端口                                     | 给 web 换端口并改 `WEB_ORIGIN`，见本页开头。                                                                                                                                                       |
+| Grafana 和 web 抢 3001 端口                                     | 在 `.env` 里设 `WEB_PORT` 并同步改 `WEB_ORIGIN`，见本页开头。                                                                                                                                      |
 
 ## 数据在哪
 

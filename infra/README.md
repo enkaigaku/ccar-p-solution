@@ -26,7 +26,7 @@ pnpm --filter @incident/web dev          # 终端 2：http://localhost:3001，�
 - Keycloak 用 `start-dev`（HTTP、内嵌数据库），只适合本机演示。`down` 会丢弃 realm 和所有会话，下次 `up` 重新导入；改了 realm 文件或 `.env` 后要 `down` 再 `up`。
 - 管理控制台：<http://localhost:8080/admin>（端口随 `KEYCLOAK_PORT`），用户 `admin`，密码 `KEYCLOAK_ADMIN_PASSWORD`。
 - 默认端口 8080 与 OpenTelemetry Demo 的 frontend-proxy 相同。两者同时运行时在 `.env` 里设 `KEYCLOAK_PORT`（例如 8081），并把 `OIDC_ISSUER` 里的端口改成同一个，然后 `down` 再 `up`；api 和 web 的终端要重新加载 `.env`。
-- web 的默认端口 3001 与下面 Grafana 的 3001 相同，两者同时运行时给 web 换一个端口，并把 `WEB_ORIGIN` 设成新地址（Keycloak 也读这个变量，改后要重建容器）。
+- web 的默认端口 3001 与下面 Grafana 的 3001 相同，两者同时运行时在 `.env` 里设 `WEB_PORT`（例如 3002），并把 `WEB_ORIGIN` 改成同一个端口的地址（Keycloak 也读这个变量，改后要重建容器）。
 - 评估和不需要登录的开发用 `AUTH_MODE=dev pnpm dev:api`，不要设置 `OIDC_ISSUER`。
 
 ## 观测后端（`observability/`，ADR 008）
